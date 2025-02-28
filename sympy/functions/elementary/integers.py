@@ -5,7 +5,7 @@ from sympy.core.expr import Expr
 
 from sympy.core import Add, S
 from sympy.core.evalf import get_integer_part, PrecisionExhausted
-from sympy.core.function import Function
+from sympy.core.function import DefinedFunction
 from sympy.core.logic import fuzzy_or
 from sympy.core.numbers import Integer, int_valued
 from sympy.core.relational import Gt, Lt, Ge, Le, Relational, is_eq
@@ -18,7 +18,7 @@ from sympy.multipledispatch import dispatch
 ###############################################################################
 
 
-class RoundFunction(Function):
+class RoundFunction(DefinedFunction):
     """Abstract base class for rounding functions."""
 
     args: tTuple[Expr]
@@ -219,7 +219,7 @@ class floor(RoundFunction):
                 return self.args[0] >= other
             if other.is_number and other.is_real:
                 return self.args[0] >= ceiling(other)
-        if self.args[0] == other and other.is_real:
+        if self.args[0] == other and other.is_real and other.is_noninteger:
             return S.false
         if other is S.NegativeInfinity and self.is_finite:
             return S.true
@@ -247,8 +247,8 @@ class floor(RoundFunction):
                 return self.args[0] < other
             if other.is_number and other.is_real:
                 return self.args[0] < ceiling(other)
-        if self.args[0] == other and other.is_real:
-            return S.false
+        if self.args[0] == other and other.is_real and other.is_noninteger:
+            return S.true
         if other is S.Infinity and self.is_finite:
             return S.true
 
@@ -257,7 +257,7 @@ class floor(RoundFunction):
 
 @dispatch(floor, Expr)
 def _eval_is_eq(lhs, rhs): # noqa:F811
-   return is_eq(lhs.rewrite(ceiling), rhs) or \
+    return is_eq(lhs.rewrite(ceiling), rhs) or \
         is_eq(lhs.rewrite(frac),rhs)
 
 
@@ -387,8 +387,8 @@ class ceiling(RoundFunction):
                 return self.args[0] > other
             if other.is_number and other.is_real:
                 return self.args[0] > floor(other)
-        if self.args[0] == other and other.is_real:
-            return S.false
+        if self.args[0] == other and other.is_real and other.is_noninteger:
+            return S.true
         if other is S.NegativeInfinity and self.is_finite:
             return S.true
 
@@ -415,7 +415,7 @@ class ceiling(RoundFunction):
                 return self.args[0] <= other
             if other.is_number and other.is_real:
                 return self.args[0] <= floor(other)
-        if self.args[0] == other and other.is_real:
+        if self.args[0] == other and other.is_real and other.is_noninteger:
             return S.false
         if other is S.Infinity and self.is_finite:
             return S.true
@@ -428,7 +428,7 @@ def _eval_is_eq(lhs, rhs): # noqa:F811
     return is_eq(lhs.rewrite(floor), rhs) or is_eq(lhs.rewrite(frac),rhs)
 
 
-class frac(Function):
+class frac(DefinedFunction):
     r"""Represents the fractional part of x
 
     For real numbers it is defined [1]_ as

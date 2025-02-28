@@ -1651,8 +1651,8 @@ def discrete_log(n, a, b, order=None, prime_order=None):
             i = 0
             for _ in range(e):
                 if pow(b, order // p, n) == 1:
-                   order //= p
-                   i += 1
+                    order //= p
+                    i += 1
                 else:
                     break
             if i < e:
@@ -1741,7 +1741,10 @@ def quadratic_congruence(a, b, c, n):
         return sorted((i - b) % n for i in sqrt_mod_iter(b**2 - c, n))
     res = set()
     for i in sqrt_mod_iter(b**2 - 4*a*c, 4*a*n):
-        res.update(j % n for j in linear_congruence(2*a, i - b, 4*a*n))
+        q, rem = divmod(i - b, 2*a)
+        if rem == 0:
+            res.add(q % n)
+
     return sorted(res)
 
 

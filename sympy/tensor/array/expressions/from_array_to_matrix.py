@@ -395,10 +395,10 @@ def _(expr: ArrayTensorProduct):
             elif pending == k:
                 prev = newargs[-1]
                 if prev.shape[0] == 1:
-                    d1 = cumul[prev_i]
+                    d1 = cumul[prev_i]  # type: ignore
                     prev = _a2m_transpose(prev)
                 else:
-                    d1 = cumul[prev_i] + 1
+                    d1 = cumul[prev_i] + 1  # type: ignore
                 if arg.shape[1] == 1:
                     d2 = cumul[i] + 1
                     arg = _a2m_transpose(arg)
@@ -784,7 +784,7 @@ def identify_hadamard_products(expr: tUnion[ArrayContraction, ArrayDiagonal]):
             make_trace = True
             first_element = v[0].element
             if not check_transpose(v[0].indices):
-                first_element = first_element.T
+                first_element = first_element.T # type: ignore
             hadamard_factors = v[1:]
         else:
             hadamard_factors = v

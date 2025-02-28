@@ -278,10 +278,10 @@ def phase_margin(system):
     mag_sol = list(solveset(mag, _w, Interval(0, oo, left_open=True)))
 
     if (len(mag_sol) == 0):
-      pm = S(-180)
+        pm = S(-180)
     else:
-      wcp = mag_sol[0]
-      pm = ((arg(w_expr)*S(180)/pi).subs({_w:wcp}) + S(180)) % 360
+        wcp = mag_sol[0]
+        pm = ((arg(w_expr)*S(180)/pi).subs({_w:wcp}) + S(180)) % 360
 
     if(pm >= 180):
         pm = pm - 360
@@ -753,8 +753,7 @@ class TransferFunction(SISOLinearTimeInvariant):
         >>> tf = TransferFunction.from_coeff_lists(num, den, s)
         >>> tf
         TransferFunction(s**2 + 2, 3*s**3 + 2*s**2 + 2*s + 1, s)
-
-        # Create a Transfer Function with more than one variable
+        >>> #Create a Transfer Function with more than one variable
         >>> tf1 = TransferFunction.from_coeff_lists([p, 1], [2*p, 0, 4], s)
         >>> tf1
         TransferFunction(p*s + 1, 2*p*s**2 + 4, s)
@@ -802,13 +801,11 @@ class TransferFunction(SISOLinearTimeInvariant):
         >>> tf = TransferFunction.from_zpk(zeros, poles, gain, s)
         >>> tf
         TransferFunction(7*(s - 3)*(s - 2)*(s - 1), (s - 6)*(s - 5)*(s - 4), s)
-
-        # Create a Transfer Function with variable poles and zeros
+        >>> #Create a Transfer Function with variable poles and zeros
         >>> tf1 = TransferFunction.from_zpk([p, k], [p + k, p - k], 2, s)
         >>> tf1
         TransferFunction(2*(-k + s)*(-p + s), (-k - p + s)*(k - p + s), s)
-
-        # Complex poles or zeros are acceptable
+        >>> #Complex poles or zeros are acceptable
         >>> tf2 = TransferFunction.from_zpk([0], [1-1j, 1+1j, 2], -2, s)
         >>> tf2
         TransferFunction(-2*s, (s - 2)*(s - 1.0 - 1.0*I)*(s - 1.0 + 1.0*I), s)

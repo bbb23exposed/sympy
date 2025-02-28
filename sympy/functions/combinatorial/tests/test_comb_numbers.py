@@ -430,7 +430,7 @@ def test_euler_polynomials():
 
 def test_euler_polynomial_rewrite():
     m = Symbol('m')
-    A = euler(m, x).rewrite('Sum');
+    A = euler(m, x).rewrite('Sum')
     assert A.subs({m:3, x:5}).doit() == euler(3, 5)
 
 
@@ -574,6 +574,12 @@ def test_partition():
     assert partition(x).subs(x, 7) == 15
     assert partition(y).subs(y, 8) == 22
     raises(TypeError, lambda: partition(Rational(5, 4)))
+    assert partition(9, evaluate=False) % 5 == 0
+    assert partition(5*m + 4) % 5 == 0
+    assert partition(47, evaluate=False) % 7 == 0
+    assert partition(7*m + 5) % 7 == 0
+    assert partition(50, evaluate=False) % 11 == 0
+    assert partition(11*m + 6) % 11 == 0
 
 
 def test_divisor_sigma():
@@ -959,15 +965,15 @@ def test_primepi():
 
 
 def test__nT():
-       assert [_nT(i, j) for i in range(5) for j in range(i + 2)] == [
-    1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 2, 1, 1, 0]
-       check = [_nT(10, i) for i in range(11)]
-       assert check == [0, 1, 5, 8, 9, 7, 5, 3, 2, 1, 1]
-       assert all(type(i) is int for i in check)
-       assert _nT(10, 5) == 7
-       assert _nT(100, 98) == 2
-       assert _nT(100, 100) == 1
-       assert _nT(10, 3) == 8
+    assert [_nT(i, j) for i in range(5) for j in range(i + 2)] == [
+            1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 2, 1, 1, 0]
+    check = [_nT(10, i) for i in range(11)]
+    assert check == [0, 1, 5, 8, 9, 7, 5, 3, 2, 1, 1]
+    assert all(type(i) is int for i in check)
+    assert _nT(10, 5) == 7
+    assert _nT(100, 98) == 2
+    assert _nT(100, 100) == 1
+    assert _nT(10, 3) == 8
 
 
 def test_nC_nP_nT():

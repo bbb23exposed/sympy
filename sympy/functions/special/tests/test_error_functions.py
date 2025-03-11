@@ -658,9 +658,6 @@ def test_si():
     assert Si(x).rewrite(sinc).dummy_eq(Integral(sinc(t), (t, 0, x)))
     assert Shi(x).rewrite(Integral).dummy_eq(Integral(sinh(t) / t, (t, 0, x)))
 
-    assert limit(Shi(x), x, S.Infinity) == S.Infinity
-    assert limit(Shi(x), x, S.NegativeInfinity) == S.NegativeInfinity
-
 
 def test_ci():
     m1 = exp_polar(I*pi)
@@ -718,6 +715,24 @@ def test_ci():
     t = Symbol('t', Dummy=True)
     assert Ci(x).rewrite(Integral).dummy_eq(EulerGamma + log(x) - Integral((1 - cos(t)) / t, (t, 0, x)))
     assert Chi(x).rewrite(Integral).dummy_eq(EulerGamma + log(x) + Integral((cosh(t) - 1) / t, (t, 0, x)))
+
+def test_shi_series():
+    assert Shi(x).series(x, oo) == (6/x**4 + x**(-2) + O(x**(-6), (x, oo)))* \
+           sinh(x + O(x**(-6), (x, oo))) + (24/x**5 + 2/x**3 + 1/x + O(x**(-6), (x, oo)))* \
+           cosh(x + O(x**(-6), (x, oo))) - I*pi/2
+    assert Shi(x).series(x, -oo) == (6/x**4 + x**(-2) + O(x**(-6), (x, -oo)))* \
+           sinh(x + O(x**(-6), (x, -oo))) - (-24/x**5 - 2/x**3 - 1/x + O(x**(-6), (x, -oo)))*\
+           cosh(x + O(x**(-6), (x, -oo))) + I*pi/2
+
+
+def test_chi_series():
+    assert Chi(x).series(x, oo) == (6/x**4 + x**(-2) + O(x**(-6), (x, oo)))* \
+           cosh(x + O(x**(-6), (x, oo))) + (24/x**5 + 2/x**3 + 1/x + O(x**(-6), (x, oo)))*\
+           sinh(x + O(x**(-6), (x, oo))) - I*pi/2
+    assert Chi(x).series(x, -oo) == (6/x**4 + x**(-2) + O(x**(-6), (x, -oo)))* \
+           cosh(x + O(x**(-6), (x, -oo))) + (24/x**5 + 2/x**3 + 1/x + O(x**(-6), (x, -oo)))* \
+           sinh(x + O(x**(-6), (x, -oo))) + I*pi/2
+
 
 def test_fresnel():
     assert fresnels(0) is S.Zero

@@ -29,7 +29,8 @@ from sympy.polys.polytools import (
     cancel, reduced, groebner,
     GroebnerBasis, is_zero_dimensional,
     _torational_factor_list,
-    to_rational_coeffs)
+    to_rational_coeffs,
+    extended_euclidean_algorithm)
 
 from sympy.polys.polyerrors import (
     MultivariatePolynomialError,
@@ -65,7 +66,7 @@ from sympy.core.numbers import (Float, I, Integer, Rational, oo, pi)
 from sympy.core.power import Pow
 from sympy.core.relational import Eq
 from sympy.core.singleton import S
-from sympy.core.symbol import Symbol
+from sympy.core.symbol import Symbol, symbols
 from sympy.functions.elementary.complexes import (im, re)
 from sympy.functions.elementary.exponential import exp
 from sympy.functions.elementary.hyperbolic import tanh
@@ -1926,6 +1927,18 @@ def test_issue_7864():
     q, r = div(a, .408248290463863*a)
     assert abs(q - 2.44948974278318) < 1e-14
     assert r == 0
+
+
+def test_extended_euclidean_algorithm():
+    f = Poly(x**5 + 2*x**4 - x**2 + 1, x)
+    g = Poly(x**4 - 1, x)
+    eea_result = extended_euclidean_algorithm(f, g)
+
+    r_degree = 5
+    for si, ti, ri in eea_result:
+        assert si*f + ti*g == ri
+        assert ri.degree() < r_degree
+        r_degree = ri.degree()
 
 
 def test_gcdex():
@@ -3974,3 +3987,65 @@ def test_issue_20985():
     w, R = symbols('w R')
     poly = Poly(1.0 + I*w/R, w, 1/R)
     assert poly.degree() == S(1)
+
+
+def test_Poly_from_roots():
+
+    x, a, b = symbols('x a b')
+
+    assert Poly.from_roots([], x) == Poly(1, x)
+    assert Poly.from_roots([1], x) == Poly(x - 1, x)
+    assert Poly.from_roots([-2], x) == Poly(x + 2, x)
+
+    assert Poly.from_roots([1, 1], x) == Poly(x**2 - 2*x + 1, x)
+    assert Poly.from_roots([2, 2, 2], x) == Poly(x**3 - 6*x**2 + 12*x - 8, x)
+
+    assert Poly.from_roots([1, 2, 3], x) == Poly(x**3 - 6*x**2 + 11*x - 6, x)
+    assert Poly.from_roots([1, 2, 3, 4], x) == Poly(x**4 - 10*x**3 + 35*x**2 - 50*x + 24, x)
+
+    assert Poly.from_roots([-1, -2], x) == Poly(x**2 + 3*x + 2, x)
+    assert Poly.from_roots([-1, -2, -3], x) == Poly(x**3 + 6*x**2 + 11*x + 6, x)
+
+    assert Poly.from_roots([0], x) == Poly(x, x)
+    assert Poly.from_roots([0, 0], x) == Poly(x**2, x)
+    assert Poly.from_roots([0, 1, 2], x) == Poly(x**3 - 3*x**2 + 2*x, x)
+
+    assert Poly.from_roots([a], x) == Poly(x - a, x)
+    assert Poly.from_roots([a, b], x) == Poly(x**2 - (a + b)*x + a*b, x)
+
+    assert Poly.from_roots([Rational(1, 2), 2], x) == Poly(x**2 - Rational(5, 2)*x + 1, x)
+    assert Poly.from_roots([Rational(7, 2), 5], x) == Poly(x**2 - Rational(17, 2)*x + Rational(35, 2), x, domain='QQ')
+
+    coeffs = Poly.from_roots([Rational(7, 2), 5], x).all_coeffs()
+    poly = 2 * 3 * Poly(coeffs, x, domain='QQ')
+    assert poly == Poly(6*x**2 - 51*x + 105, x, domain='QQ')
+
+
+def test_polynomial():
+    from sympy.core.symbol import symbols
+    x, y = symbols('x y')
+    p = Poly(x**2, x)
+
+    assert str(p) == "Poly(x**2, x, domain='ZZ')"
+
+    result_by_2 = p / 2
+    assert str(result_by_2) == "Poly(1/2*x**2, x, domain='QQ')"
+
+    result_by_x = p / x
+    assert str(result_by_x) == "Poly(x, x, domain='QQ')"
+
+    result_rec = 1 / p
+    assert result_rec == 1 / (x**2)
+
+    result_by_self = p / p
+    assert result_by_self == 1
+
+    p2 = Poly(x**2*y + x, x)
+    assert str(p2) == "Poly(y*x**2 + x, x, domain='ZZ[y]')"
+
+    result_p2_by_y = p2 / y
+    assert str(result_p2_by_y) == "Poly(x**2 + 1/y*x, x, domain='ZZ(y)')"
+
+    result_p2_by_exp = p2 / exp(y)
+    expected = (x**2 * y + x) * exp(-y)
+    assert result_p2_by_exp == expected

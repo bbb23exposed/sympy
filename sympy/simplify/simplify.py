@@ -264,7 +264,7 @@ def posify(eq):
     [2]
     """
     eq = sympify(eq)
-    if iterable(eq):
+    if not isinstance(eq, Basic) and iterable(eq):
         f = type(eq)
         eq = list(eq)
         syms = set()
@@ -710,7 +710,7 @@ def simplify(expr, ratio=1.7, measure=count_ops, rational=False, inverse=False, 
         expr = besselsimp(expr)
 
     if expr.has(TrigonometricFunction, HyperbolicFunction):
-        expr = trigsimp(expr, deep=True)
+        expr = trigsimp(expr, deep=True, measure=measure)
 
     if expr.has(log):
         expr = shorter(expand_log(expr, deep=True), logcombine(expr))

@@ -48,7 +48,7 @@ from sympy.ntheory.factor_ import divisors
 from sympy.ntheory.residue_ntheory import discrete_log, nthroot_mod
 from sympy.polys import (roots, Poly, degree, together, PolynomialError,
                          RootOf, factor, lcm, gcd)
-from sympy.polys.polyerrors import CoercionFailed
+from sympy.polys.polyerrors import CoercionFailed, NotInvertible
 from sympy.polys.polytools import invert, groebner, poly
 from sympy.polys.solvers import (sympy_eqs_to_ring, solve_lin_sys,
     PolyNonlinearError)
@@ -60,6 +60,7 @@ from sympy.utilities import filldedent
 from sympy.utilities.iterables import (numbered_symbols, has_dups,
                                        is_sequence, iterable)
 from sympy.calculus.util import periodicity, continuous_domain, function_range
+from sympy.assumptions import ask
 
 
 from types import GeneratorType
@@ -1302,8 +1303,10 @@ def _solveset(f, symbol, domain, _check=False):
     elif f.is_Relational:
         from .inequalities import solve_univariate_inequality
         try:
-            result = solve_univariate_inequality(
-            f, symbol, domain=domain, relational=False)
+            if domain == S.Reals:
+                result = _solve_periodic_inequality(f, symbol, domain)
+            else:
+                result = solve_univariate_inequality(f, symbol, domain=domain, relational=False)
         except NotImplementedError:
             result = ConditionSet(symbol, f, domain)
         return result
@@ -1536,7 +1539,7 @@ def _invert_modular(modterm, rhs, n, symbol):
         # Check for complex arguments
         return modterm, rhs
 
-    if abs(rhs) >= abs(m):
+    if ask(abs(rhs) >= abs(m)):
         # if rhs has value greater than value of m.
         return symbol, S.EmptySet
 
@@ -1548,14 +1551,17 @@ def _invert_modular(modterm, rhs, n, symbol):
         g, h = a.as_independent(symbol)
         if g is not S.Zero:
             x_indep_term = rhs - Mod(g, m)
-            return _invert_modular(Mod(h, m), Mod(x_indep_term, m), n, symbol)
+            return _invert_modular(Mod(h, m, evaluate=False), Mod(x_indep_term, m), n, symbol)
 
     if a.is_Mul:
         # g*h = a
         g, h = a.as_independent(symbol)
         if g is not S.One:
-            x_indep_term = rhs*invert(g, m)
-            return _invert_modular(Mod(h, m), Mod(x_indep_term, m), n, symbol)
+            try:
+                x_indep_term = rhs*invert(g, m)
+            except NotInvertible:
+                return modterm, rhs
+            return _invert_modular(Mod(h, m, evaluate=False), Mod(x_indep_term, m), n, symbol)
 
     if a.is_Pow:
         # base**expo = a
@@ -1566,9 +1572,8 @@ def _invert_modular(modterm, rhs, n, symbol):
             if not m.is_Integer and rhs.is_Integer and a.base.is_Integer:
                 return modterm, rhs
 
-            mdiv = m.p // number_gcd(m.p, rhs.p)
             try:
-                remainder = discrete_log(mdiv, rhs.p, a.base.p)
+                remainder = discrete_log(m.p, rhs.p, a.base.p)
             except ValueError:  # log does not exist
                 return modterm, rhs
             # period -> coefficient of n in the solution and also referred as
@@ -1690,6 +1695,34 @@ def _solve_modular(f, symbol, domain):
 
     return unsolved_result
 
+def _solve_periodic_inequality(expr, symbol, domain=S.Reals):
+    """
+    Special-case solver for periodic inequalities.
+    If the inequality is periodic in `symbol` (and the domain is S.Reals),
+    this function computes the base solution over one period and then
+    lifts it to the entire domain.
+    """
+    from sympy.solvers.inequalities import solve_univariate_inequality
+    from sympy import periodicity, Interval, Dummy, imageset, Lambda, S
+
+    # Determine the period from the difference (lhs - rhs)
+    per = periodicity(expr.lhs - expr.rhs, symbol)
+    if per and per != S.Zero and domain == S.Reals:
+        period_domain = Interval(0, per, False, True)
+        base_sol = solve_univariate_inequality(expr, symbol, relational=False, domain=period_domain)
+        # If the solution covers the entire period, return S.Reals.
+        if base_sol == period_domain:
+            return S.Reals
+        # Otherwise, shift the one-period solution over all integers.
+        n = Dummy('n', integer=True)
+        shifted_interval = Interval(base_sol.inf + per*n,
+                                    base_sol.sup + per*n,
+                                    base_sol.left_open,
+                                    base_sol.right_open)
+        return imageset(Lambda(n, shifted_interval), S.Integers)
+    else:
+        # Fall back to the standard solver if not periodic
+        return solve_univariate_inequality(expr, symbol, relational=False, domain=domain)
 
 def _term_factors(f):
     """

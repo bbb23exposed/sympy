@@ -2699,7 +2699,7 @@ def test_solve_Piecewise():
         (100 - 26*x, (x >= 0) & (x >= 2) & (x >= 4) & (x < 10)),
         (16*x - 3*(x - 6)**2/2 - 176, (x >= 2) & (x >= 4) & (x >= 6) & (x < 10)),
         (100 - 30*x, (x >= 2) & (x >= 4) & (x < 10)),
-        (30*x - 3*(x - 6)**2/2 - 196, (x>= 0) & (x >= 4) & (x >= 6) & (x < 10)),
+        (30*x - 3*(x - 6)**2/2 - 196, (x >= 0) & (x >= 4) & (x >= 6) & (x < 10)),
         (80 - 16*x, (x >= 0) & (x >= 4) & (x < 10)),
         (26*x - 3*(x - 6)**2/2 - 196, (x >= 4) & (x >= 6) & (x < 10)),
         (80 - 20*x, (x >= 4) & (x < 10)),
@@ -2713,8 +2713,37 @@ def test_solve_Piecewise():
         (0, x < 10),  # this will simplify away
         (S.NaN,True)))
 
+
 def test_issue_8397():
     try:
         nsolve(Eq(-x - 1, -x + 1), 10)  # Attempt to solve a contradiction
     except ValueError as e:
         assert str(e) == "the equation has no solution"
+
+
+def test_issue_23834():
+    # Define symbols
+    x, h, p, k, a, b, c = symbols('x h p k a b c')
+
+    # Test case 1: Linear system
+    eq1 = a*x + a + b - x/2
+    sol1 = solve_undetermined_coeffs(eq1, [a, b], x)
+    assert sol1 == {a: Rational(1, 2), b: Rational(-1, 2)}
+
+    # Test case 2: Nonlinear system
+    eq2 = a*x**2 + b*x + c - ((x - h)**2 + 4*p*k)/4/p
+    sol2 = solve_undetermined_coeffs(eq2, (h, p, k), x)
+    expected_sol2 = {h: -b/(2*a), k: (4*a*c - b**2)/(4*a), p: 1/(4*a)}
+    assert sol2 == expected_sol2
+
+    # Test case 3: Multiple solutions
+    eq3 = a**2*x + b - x
+    sol3 = solve_undetermined_coeffs(eq3, [a, b], x)
+    expected_sol3 = [{a: -1, b: 0}, {a: 1, b: 0}]
+    assert sol3 == expected_sol3
+
+    # Test case 4: Coefficients on different generators
+    eq4 = cos(x)*a - 2*cos(x) + b*x - 3*x
+    sol5 = solve_undetermined_coeffs(eq4, (a, b), x)
+    expected_sol5 = {a: 2, b: 3}
+    assert sol5 == expected_sol5

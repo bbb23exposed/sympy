@@ -2714,6 +2714,19 @@ def test_solve_Piecewise():
         (S.NaN,True)))
 
 
+def test_issue_27233():
+
+    x, y = symbols('x y', real=True)
+
+    eq1 = (x**2 - 6*x + y**2 + 9) * log(Abs(x) - Abs(y) - 2)
+    eq2 = x**2 - y
+
+    solutions = solve([eq1, eq2], [x, y])
+    assert solutions == [
+        {x: 3, y: 0}, {x: -3, y: 0}
+    ]
+
+
 def test_issue_8397():
     try:
         nsolve(Eq(-x - 1, -x + 1), 10)  # Attempt to solve a contradiction

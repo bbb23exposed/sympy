@@ -2445,6 +2445,8 @@ class Subs(Expr):
         return self.expr.as_leading_term(x)
 
 
+from sympy.core.cache import cacheit
+@cacheit
 def diff(f, *symbols, **kwargs):
     """
     Differentiate f with respect to symbols.
@@ -2513,6 +2515,7 @@ def diff(f, *symbols, **kwargs):
         return f.diff(*symbols, **kwargs)
     kwargs.setdefault('evaluate', True)
     return _derivative_dispatch(f, *symbols, **kwargs)
+
 
 
 def expand(e, deep=True, modulus=None, power_base=True, power_exp=True,

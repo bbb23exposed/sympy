@@ -29,7 +29,8 @@ from sympy.polys.polytools import (
     cancel, reduced, groebner,
     GroebnerBasis, is_zero_dimensional,
     _torational_factor_list,
-    to_rational_coeffs)
+    to_rational_coeffs,
+    extended_euclidean_algorithm)
 
 from sympy.polys.polyerrors import (
     MultivariatePolynomialError,
@@ -1928,6 +1929,18 @@ def test_issue_7864():
     assert r == 0
 
 
+def test_extended_euclidean_algorithm():
+    f = Poly(x**5 + 2*x**4 - x**2 + 1, x)
+    g = Poly(x**4 - 1, x)
+    eea_result = extended_euclidean_algorithm(f, g)
+
+    r_degree = 5
+    for si, ti, ri in eea_result:
+        assert si*f + ti*g == ri
+        assert ri.degree() < r_degree
+        r_degree = ri.degree()
+
+
 def test_gcdex():
     f, g = 2*x, x**2 - 16
     s, t, h = x/32, Rational(-1, 16), 1
@@ -3202,6 +3215,12 @@ def test_nroots():
         '1.7 + 2.5*I]')
     assert str(Poly(1e-15*x**2 -1).nroots()) == ('[-31622776.6016838, 31622776.6016838]')
 
+    # https://github.com/sympy/sympy/issues/23861
+
+    i = Float('3.000000000000000000000000000000000000000000000000001')
+    [r] = nroots(x + I*i, n=300)
+    assert abs(r + I*i) < 1e-300
+
 
 def test_ground_roots():
     f = x**6 - 4*x**4 + 4*x**3 - x**2
@@ -3567,6 +3586,33 @@ def test_reduced():
 
     assert reduced(1, [1], x) == ([1], 0)
     raises(ComputationFailed, lambda: reduced(1, [1]))
+
+    f_poly = Poly(2*x**3 + y**3 + 3*y)
+    G_poly = groebner([Poly(x**2 + y**2 - 1), Poly(x*y - 2)])
+
+    Q_poly = [Poly(x**2 - 1/2*x*y**3 + 1/2*x*y + 1/4*y**6 - 1/2*y**4 + 1/4*y**2, x, y, domain='QQ'),
+              Poly(-1/4*y**5 + 1/2*y**3 + 3/4*y, x, y, domain='QQ')]
+    r_poly = Poly(0, x, y, domain='QQ')
+
+    assert G_poly.reduce(f_poly) == (Q_poly, r_poly)
+
+    Q, r = G_poly.reduce(f)
+    assert all(isinstance(q, Poly) for q in Q)
+    assert isinstance(r, Poly)
+
+    f_wrong_gens = Poly(2*x**3 + y**3 + 3*y, x, y, z)
+    raises(ValueError, lambda: G_poly.reduce(f_wrong_gens))
+
+    zero_poly = Poly(0, x, y)
+    Q, r = G_poly.reduce(zero_poly)
+    assert all(q.is_zero for q in Q)
+    assert r.is_zero
+
+    const_poly = Poly(1, x, y)
+    Q, r = G_poly.reduce(const_poly)
+    assert isinstance(r, Poly)
+    assert r.as_expr() == 1
+    assert all(q.is_zero for q in Q)
 
 
 def test_groebner():
@@ -3941,3 +3987,33 @@ def test_issue_20985():
     w, R = symbols('w R')
     poly = Poly(1.0 + I*w/R, w, 1/R)
     assert poly.degree() == S(1)
+
+
+def test_polynomial():
+    from sympy.core.symbol import symbols
+    x, y = symbols('x y')
+    p = Poly(x**2, x)
+
+    assert str(p) == "Poly(x**2, x, domain='ZZ')"
+
+    result_by_2 = p / 2
+    assert str(result_by_2) == "Poly(1/2*x**2, x, domain='QQ')"
+
+    result_by_x = p / x
+    assert str(result_by_x) == "Poly(x, x, domain='QQ')"
+
+    result_rec = 1 / p
+    assert result_rec == 1 / (x**2)
+
+    result_by_self = p / p
+    assert result_by_self == 1
+
+    p2 = Poly(x**2*y + x, x)
+    assert str(p2) == "Poly(y*x**2 + x, x, domain='ZZ[y]')"
+
+    result_p2_by_y = p2 / y
+    assert str(result_p2_by_y) == "Poly(x**2 + 1/y*x, x, domain='ZZ(y)')"
+
+    result_p2_by_exp = p2 / exp(y)
+    expected = (x**2 * y + x) * exp(-y)
+    assert result_p2_by_exp == expected

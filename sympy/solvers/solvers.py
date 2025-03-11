@@ -797,7 +797,7 @@ def solve(f, *symbols, **flags):
             Allows ``solve`` to return a solution for a pattern in terms of
             other functions that contain that pattern; this is only
             needed if the pattern is inside of some invertible function
-            like cos, exp, ect.
+            like cos, exp, etc.
         particular=True (default is False)
             Instructs ``solve`` to try to find a particular solution to
             a linear system with as many zeros as possible; this is very
@@ -1633,6 +1633,8 @@ def _solve(f, *symbols, **flags):
                     # or high-order EX domain.
                     try:
                         soln = poly.all_roots()
+                        if any(isinstance(root , log) for root in soln):
+                            return soln
                     except NotImplementedError:
                         if not flags.get('incomplete', True):
                                 raise NotImplementedError(
@@ -1791,7 +1793,7 @@ def _solve_system(exprs, symbols, **flags):
                 if not isinstance(subsol, list):
                     subsol = [subsol]
                 subsols.append(subsol)
-            # Full solution is cartesion product of subsystems
+            # Full solution is cartesian product of subsystems
             sols = []
             for soldicts in product(*subsols):
                 sols.append(dict(item for sd in soldicts

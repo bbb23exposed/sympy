@@ -1280,9 +1280,9 @@ def _discrete_log_trial_mul(n, a, b, order=None):
     a %= n
     b %= n
     if order is None:
-        order = n
+        order = n - 1
     x = 1
-    for i in range(order):
+    for i in range(order + 1):
         if x == a:
             return i
         x = x * b % n
@@ -1439,7 +1439,7 @@ def _discrete_log_pollard_rho(n, a, b, order=None, retries=10, rseed=None):
 
 def _discrete_log_is_smooth(n: int, factorbase: list):
     """Try to factor n with respect to a given factorbase.
-    Upon success a list of exponents with repect to the factorbase is returned.
+    Upon success a list of exponents with respect to the factorbase is returned.
     Otherwise None."""
     factors = [0]*len(factorbase)
     for i, p in enumerate(factorbase):
@@ -1486,7 +1486,7 @@ def _discrete_log_index_calculus(n, a, b, order, rseed=None):
     # We have added an extra term to the asymptotic value which
     # is closer to the theoretical optimum for n up to 2^70.
     B = int(exp(0.5 * sqrt( log(n) * log(log(n)) )*( 1 + 1/log(log(n)) )))
-    max = 5 * B * B  # expected number of trys to find a relation
+    max = 5 * B * B  # expected number of tries to find a relation
     factorbase = list(primerange(B)) # compute the factorbase
     lf = len(factorbase) # length of the factorbase
     ordermo = order-1
@@ -1539,7 +1539,7 @@ def _discrete_log_index_calculus(n, a, b, order, rseed=None):
                     relationa[j] = (relationa[j] - rbi*relations[i][j]) % order
             if relationa[i] > 0:  # the index of the first nonzero entry
                 break  # we do not need to reduce further at this point
-        else:  # all unkowns are gone
+        else:  # all unknowns are gone
             #print(f"Success after {k} relations out of {lf}")
             x = (order -relationa[lf]) % order
             if pow(b,x,n) == a:

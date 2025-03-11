@@ -2557,6 +2557,12 @@ def test_issue_25221():
     assert ask(Q.transcendental(x), Q.algebraic(x) | Q.gt(0,y)) is None
 
 
+def test_issue_27440():
+    nan = S.NaN
+    assert ask(Q.negative(nan)) is None
+
+
 def test_issues_27449():
     assert ask(Q.imaginary(I * oo)) is False
     assert ask(Q.imaginary(3*I * oo)) is False
+

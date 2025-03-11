@@ -22,7 +22,7 @@ from .common import test_closed_group
 from ..predicates.sets import (IntegerPredicate, RationalPredicate,
     IrrationalPredicate, RealPredicate, ExtendedRealPredicate,
     HermitianPredicate, ComplexPredicate, ImaginaryPredicate,
-    AntihermitianPredicate, AlgebraicPredicate)
+    AntihermitianPredicate, AlgebraicPredicate, TranscendentalPredicate)
 
 
 # IntegerPredicate
@@ -131,8 +131,7 @@ def _(expr, assumptions):
     * Rational + !Rational    -> !Rational
     * !Rational + !Rational   -> ?
     """
-    if expr.is_number:
-        if expr.as_real_imag()[1]:
+    if expr.is_number or expr.has(I):
             return False
     return test_closed_group(expr, assumptions, Q.rational)
 
@@ -222,7 +221,7 @@ def _(expr, assumptions):
 def _RealPredicate_number(expr, assumptions):
     # let as_real_imag() work first since the expression may
     # be simpler to evaluate
-    i = expr.as_real_imag()[1].evalf(2)
+    i = im(expr).evalf(2)
     if i._prec != 1:
         return not i
     # allow None to be returned if we couldn't show for sure
@@ -804,3 +803,37 @@ def _(expr, assumptions):
     x = expr.args[0]
     if ask(Q.algebraic(x), assumptions):
         return ask(~Q.nonzero(x - 1), assumptions)
+
+
+# TranscendentalPredicate
+
+@TranscendentalPredicate.register_many(Exp1, Pi)
+def _(expr, assumptions):
+    return True
+
+@TranscendentalPredicate.register_many(AlgebraicNumber, TribonacciConstant,
+    Infinity, ImaginaryUnit, ComplexInfinity, GoldenRatio, NegativeInfinity)
+def _(expr, assumptions):
+    return False
+
+@TranscendentalPredicate.register(Float)
+def _(expr, assumptions):
+    return None
+
+@TranscendentalPredicate.register(Expr)
+def _(expr, assumptions):
+    ret = expr.is_transcendental
+    if ret is not None:
+        return ret
+
+    is_complex = ask(Q.complex(expr), assumptions)
+    if is_complex:
+        is_algebraic = ask(Q.algebraic(expr), assumptions)
+        if is_algebraic is None:
+            return None
+        return not is_algebraic
+    return is_complex
+
+@TranscendentalPredicate.register(NaN)
+def _(expr, assumptions):
+    return None

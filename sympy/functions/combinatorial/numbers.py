@@ -1137,6 +1137,7 @@ class euler(DefinedFunction):
                 with workprec(prec):
                     res = mp.eulerpoly(n, x)
                 return Expr._from_mpmath(res, prec)
+
             return euler_poly(n, x)
 
     def _eval_rewrite_as_Sum(self, n, x=None, **kwargs):

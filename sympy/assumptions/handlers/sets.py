@@ -22,7 +22,7 @@ from .common import test_closed_group
 from ..predicates.sets import (IntegerPredicate, RationalPredicate,
     IrrationalPredicate, RealPredicate, ExtendedRealPredicate,
     HermitianPredicate, ComplexPredicate, ImaginaryPredicate,
-    AntihermitianPredicate, AlgebraicPredicate)
+    AntihermitianPredicate, AlgebraicPredicate, TranscendentalPredicate)
 
 
 # IntegerPredicate
@@ -131,8 +131,7 @@ def _(expr, assumptions):
     * Rational + !Rational    -> !Rational
     * !Rational + !Rational   -> ?
     """
-    if expr.is_number:
-        if expr.as_real_imag()[1]:
+    if expr.is_number or expr.has(I):
             return False
     return test_closed_group(expr, assumptions, Q.rational)
 
@@ -222,7 +221,7 @@ def _(expr, assumptions):
 def _RealPredicate_number(expr, assumptions):
     # let as_real_imag() work first since the expression may
     # be simpler to evaluate
-    i = expr.as_real_imag()[1].evalf(2)
+    i = im(expr).evalf(2)
     if i._prec != 1:
         return not i
     # allow None to be returned if we couldn't show for sure
@@ -510,11 +509,19 @@ def _(expr, assumptions):
 def _Imaginary_number(expr, assumptions):
     # let as_real_imag() work first since the expression may
     # be simpler to evaluate
-    r = expr.as_real_imag()[0].evalf(2)
-    if r._prec != 1:
-        return not r
-    # allow None to be returned if we couldn't show for sure
-    # that r was 0
+    if isinstance(expr, Pow) and expr.base == I:
+        exp = expr.exp
+        if exp.is_Add:
+            term = None
+            for t in exp.args:
+                if I not in t.free_symbols:
+                    term = t
+                    break
+
+            if term is not None and term.is_number:
+                mod_4 = term % 4
+                return bool(mod_4 == 1 or mod_4 == 3)
+    return expr.is_imaginary
 
 @ImaginaryPredicate.register(ImaginaryUnit) # type:ignore
 def _(expr, assumptions):
@@ -804,3 +811,37 @@ def _(expr, assumptions):
     x = expr.args[0]
     if ask(Q.algebraic(x), assumptions):
         return ask(~Q.nonzero(x - 1), assumptions)
+
+
+# TranscendentalPredicate
+
+@TranscendentalPredicate.register_many(Exp1, Pi)
+def _(expr, assumptions):
+    return True
+
+@TranscendentalPredicate.register_many(AlgebraicNumber, TribonacciConstant,
+    Infinity, ImaginaryUnit, ComplexInfinity, GoldenRatio, NegativeInfinity)
+def _(expr, assumptions):
+    return False
+
+@TranscendentalPredicate.register(Float)
+def _(expr, assumptions):
+    return None
+
+@TranscendentalPredicate.register(Expr)
+def _(expr, assumptions):
+    ret = expr.is_transcendental
+    if ret is not None:
+        return ret
+
+    is_complex = ask(Q.complex(expr), assumptions)
+    if is_complex:
+        is_algebraic = ask(Q.algebraic(expr), assumptions)
+        if is_algebraic is None:
+            return None
+        return not is_algebraic
+    return is_complex
+
+@TranscendentalPredicate.register(NaN)
+def _(expr, assumptions):
+    return None

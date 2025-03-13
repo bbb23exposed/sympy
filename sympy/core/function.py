@@ -1263,6 +1263,7 @@ class Derivative(Expr):
             raise TypeError(
                 "First argument to Derivative must be an instance of Basic (e.g., an expression like f(t))"
             )
+
         symbols_or_none = getattr(expr, "free_symbols", None)
         has_symbol_set = isinstance(symbols_or_none, set)
 

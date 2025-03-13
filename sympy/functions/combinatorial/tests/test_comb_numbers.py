@@ -427,7 +427,7 @@ def test_euler_polynomials():
     B = euler(19, S.Pi).evalf(32)
     assert abs((A - B)/A) < 1e-31
     z = Float(0.1) + Float(0.2)*I
-    expected = Float(-3126.54721663773) + I * Float(565.736261497056)
+    expected = Float(-3126.54721663773 ) + Float(565.736261497056) * I
     assert abs(euler(13, z) - expected) < 1e-10
 
 

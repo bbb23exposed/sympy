@@ -106,7 +106,7 @@ def _masked(f, *atoms):
     for i, (o, n) in enumerate(mask):
         f = f.replace(o, n)
         mask[i] = (n, o)
-    mask.reverse()
+    mask = list(reversed(mask))
     return f, mask
 
 

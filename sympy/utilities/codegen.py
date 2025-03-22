@@ -80,6 +80,7 @@ unsurmountable issues that can only be tackled with dedicated code generator:
 """
 
 import os
+import datetime
 import textwrap
 from io import StringIO
 
@@ -856,7 +857,7 @@ header_comment = """Code generated with SymPy %(version)s
 
 See http://www.sympy.org/ for more information.
 
-This file is part of '%(project)s'
+This file is part of '%(project)s,  generated at '%(datetime)s' UTC time.'
 """
 
 
@@ -886,7 +887,8 @@ class CCodeGen(CodeGen):
         code_lines = []
         code_lines.append("/" + "*"*78 + '\n')
         tmp = header_comment % {"version": sympy_version,
-                                "project": self.project}
+                                "project": self.project,
+                                "datetime": datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S')}
         code_lines.extend(" *%s*\n" % line.center(76) for line in tmp.splitlines())
         code_lines.append(" " + "*"*78 + "/\n")
         return code_lines
@@ -1099,8 +1101,9 @@ class FCodeGen(CodeGen):
         code_lines = []
         code_lines.append("!" + "*"*78 + '\n')
         tmp = header_comment % {"version": sympy_version,
-            "project": self.project}
-        code_lines.extend("!*%s*\n" % line.center(76) for line in tmp.splitlines())
+            "project": self.project,
+            "datetime": datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S')}
+        code_lines.extend(" *%s*\n" % line.center(76) for line in tmp.splitlines())
         code_lines.append("!" + "*"*78 + '\n')
         return code_lines
 
@@ -1401,7 +1404,8 @@ class JuliaCodeGen(CodeGen):
         """Writes a common header for the generated files."""
         code_lines = []
         tmp = header_comment % {"version": sympy_version,
-            "project": self.project}
+            "project": self.project,
+            "datetime": datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S')}
         for line in tmp.splitlines():
             if line == '':
                 code_lines.append("#\n")
@@ -1607,7 +1611,8 @@ class OctaveCodeGen(CodeGen):
         """Writes a common header for the generated files."""
         code_lines = []
         tmp = header_comment % {"version": sympy_version,
-            "project": self.project}
+            "project": self.project,
+            "datetime": datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S')}
         for line in tmp.splitlines():
             if line == '':
                 code_lines.append("%\n")
@@ -1839,7 +1844,8 @@ class RustCodeGen(CodeGen):
         code_lines = []
         code_lines.append("/*\n")
         tmp = header_comment % {"version": sympy_version,
-                                "project": self.project}
+                                "project": self.project,
+                                "datetime": datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S')}
         code_lines.extend((" *%s" % line.center(76)).rstrip() + "\n" for line in tmp.splitlines())
         code_lines.append(" */\n")
         return code_lines

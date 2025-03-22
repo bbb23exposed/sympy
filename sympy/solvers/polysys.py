@@ -15,6 +15,7 @@ from sympy.core.sorting import default_sort_key
 from sympy.logic.boolalg import Boolean
 from sympy.polys import Poly, groebner, roots
 from sympy.polys.domains import ZZ
+from sympy.polys.polyoptions import build_options
 from sympy.polys.polytools import parallel_poly_from_expr, sqf_part
 from sympy.polys.polyerrors import (
     ComputationFailed,
@@ -393,6 +394,13 @@ def solve_triangulated(polys, *gens, **args):
     >>> solve_triangulated(F, x, y, z)
     [(0, 0, 1), (0, 1, 0), (1, 0, 0)]
 
+    Using extension for algebraic solutions.
+
+    >>> solve_triangulated(F, x, y, z, extension=True) #doctest: +NORMALIZE_WHITESPACE
+    [(0, 0, 1), (0, 1, 0), (1, 0, 0),
+     (CRootOf(x**2 + 2*x - 1, 0), CRootOf(x**2 + 2*x - 1, 0), CRootOf(x**2 + 2*x - 1, 0)),
+     (CRootOf(x**2 + 2*x - 1, 1), CRootOf(x**2 + 2*x - 1, 1), CRootOf(x**2 + 2*x - 1, 1))]
+
     References
     ==========
 
@@ -401,20 +409,34 @@ def solve_triangulated(polys, *gens, **args):
     Algebraic Algorithms and Error-Correcting Codes, LNCS 356 247--257, 1989
 
     """
+    opt = build_options(gens, args)
+
     G = groebner(polys, gens, polys=True)
     G = list(reversed(G))
 
-    domain = args.get('domain')
+    extension = opt.get('extension', False)
+    if extension:
+        def _solve_univariate(f):
+            return [r for r, _ in f.all_roots(multiple=False, radicals=False)]
+    else:
+        domain = opt.get('domain')
 
-    if domain is not None:
-        for i, g in enumerate(G):
-            G[i] = g.set_domain(domain)
+        if domain is not None:
+            for i, g in enumerate(G):
+                G[i] = g.set_domain(domain)
+
+        def _solve_univariate(f):
+            return list(f.ground_roots().keys())
 
     f, G = G[0].ltrim(-1), G[1:]
     dom = f.get_domain()
 
-    zeros = f.ground_roots()
-    solutions = {((zero,), dom) for zero in zeros}
+    zeros = _solve_univariate(f)
+
+    if extension:
+        solutions = {((zero,), dom.algebraic_field(zero)) for zero in zeros}
+    else:
+        solutions = {((zero,), dom) for zero in zeros}
 
     var_seq = reversed(gens[:-1])
     vars_seq = postfixes(gens[1:])
@@ -429,16 +451,18 @@ def solve_triangulated(polys, *gens, **args):
                 _vars = (var,) + vars
 
                 if g.has_only_gens(*_vars) and g.degree(var) != 0:
+                    if extension:
+                        g = g.set_domain(g.domain.unify(dom))
                     h = g.ltrim(var).eval(dict(mapping))
 
                     if g.degree(var) == h.degree():
                         H.append(h)
 
             p = min(H, key=lambda h: h.degree())
-            zeros = p.ground_roots()
+            zeros = _solve_univariate(p)
 
             for zero in zeros:
-                if not zero.is_Rational:
+                if not (zero in dom):
                     dom_zero = dom.algebraic_field(zero)
                 else:
                     dom_zero = dom
@@ -845,3 +869,77 @@ def _poly_sort_key(poly):
 def _sys_sort_key(sys):
     """Sort key for lists of polynomials"""
     return list(zip(*map(_poly_sort_key, sys)))
+
+
+def get_irreducible_groebner_bases(eqs, gens=None):
+
+    polys, opts = parallel_poly_from_expr(eqs, gens)
+    domain, orig_gens = opts.domain, opts.gens
+
+    gb = groebner(polys, *orig_gens, domain=domain)
+
+    irreducible_bases = []
+    systems_to_process = [list(gb)]
+    processed_systems = set()
+
+    while systems_to_process:
+        system = systems_to_process.pop()
+
+        system_key = tuple(sorted(str(p) for p in system))
+        if system_key in processed_systems:
+            continue
+        processed_systems.add(system_key)
+
+        factored_output = factor_system_poly(system)
+        factored_systems = [sys for sys in factored_output if not _is_degenerate(sys)]
+
+        if not factored_systems:
+            irreducible_bases.append(system)
+            continue
+
+        if len(factored_systems) == 1 and all(p in factored_systems[0] for p in system) and all(
+            p in system for p in factored_systems[0]):
+            irreducible_bases.append(system)
+            continue
+
+        for sys in factored_systems:
+            if sys:
+                new_gb = groebner(sys, *orig_gens, domain=domain)
+                systems_to_process.append(list(new_gb))
+
+    return remove_redundant_bases(irreducible_bases, orig_gens, domain)
+
+
+def remove_redundant_bases(bases: list[list[Poly]], gens=None, domain=None) -> list[list[Poly]]:
+
+    if not bases:
+        return []
+
+    gb_objs = []
+    for base in bases:
+        gb_objs.append(groebner(base, *gens, domain=domain))
+
+    non_redundant = []
+
+    for i, base1 in enumerate(bases):
+        is_redundant = False
+
+        for j, base2 in enumerate(bases):
+            if i == j:
+                continue
+
+            all_reduced = True
+            for eq in base2:
+                _, remainder = gb_objs[i].reduce(eq)
+                if remainder != 0:
+                    all_reduced = False
+                    break
+
+            if all_reduced:
+                is_redundant = True
+                break
+
+        if not is_redundant:
+            non_redundant.append(base1)
+
+    return non_redundant

@@ -1079,7 +1079,7 @@ class Derivative(Expr):
         2*f(x)
 
     Such derivatives will show up when the chain rule is used to
-    evalulate a derivative:
+    evaluate a derivative:
 
         >>> f(g(x)).diff(x)
         Derivative(f(g(x)), g(x))*Derivative(g(x), x)
@@ -1259,6 +1259,11 @@ class Derivative(Expr):
 
     def __new__(cls, expr, *variables, **kwargs):
         expr = sympify(expr)
+        if not isinstance(expr, Basic):
+            raise TypeError(
+                "First argument to Derivative must be an instance of Basic (e.g., an expression like f(t))"
+            )
+
         symbols_or_none = getattr(expr, "free_symbols", None)
         has_symbol_set = isinstance(symbols_or_none, set)
 
@@ -2439,6 +2444,8 @@ class Subs(Expr):
         return self.expr.as_leading_term(x)
 
 
+from sympy.core.cache import cacheit
+@cacheit
 def diff(f, *symbols, **kwargs):
     """
     Differentiate f with respect to symbols.
@@ -2507,6 +2514,7 @@ def diff(f, *symbols, **kwargs):
         return f.diff(*symbols, **kwargs)
     kwargs.setdefault('evaluate', True)
     return _derivative_dispatch(f, *symbols, **kwargs)
+
 
 
 def expand(e, deep=True, modulus=None, power_base=True, power_exp=True,

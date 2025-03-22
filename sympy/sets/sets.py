@@ -25,7 +25,7 @@ from sympy.core.symbol import symbols, Symbol, Dummy, uniquely_named_symbol
 from sympy.core.sympify import _sympify, sympify, _sympy_converter
 from sympy.functions.elementary.exponential import exp, log
 from sympy.functions.elementary.miscellaneous import Max, Min
-from sympy.logic.boolalg import And, Or, Not, Xor, true, false
+from sympy.logic.boolalg import And, Or, Not, Xor, true, false, Boolean
 from sympy.utilities.decorator import deprecated
 from sympy.utilities.exceptions import sympy_deprecation_warning
 from sympy.utilities.iterables import (iproduct, sift, roundrobin, iterable,
@@ -37,7 +37,7 @@ from mpmath import mpi, mpf
 from mpmath.libmp.libmpf import prec_to_dps
 
 
-tfn = defaultdict(lambda: None, {
+tfn: dict[bool | Boolean | None, Boolean | None] = defaultdict(lambda: None, {
     True: S.true,
     S.true: S.true,
     False: S.false,
@@ -1577,6 +1577,10 @@ class Intersection(Set, LatticeOp):
     def _sup(self):
         raise NotImplementedError()
 
+    @property
+    def _measure(self):
+        raise NotImplementedError("Measure for unevaluated `Intersection` is undefined")
+
     def _contains(self, other):
         return And(*[set.contains(other) for set in self.args])
 
@@ -1807,6 +1811,10 @@ class Complement(Set):
         elif a_finite is False and B.is_finite_set:
             return False
 
+    @property
+    def _measure(self):
+        NotImplementedError("Measure for unevaluated `Complement` is undefined")
+
     def __iter__(self):
         A, B = self.args
         for a in A:
@@ -1859,7 +1867,7 @@ class EmptySet(Set, metaclass=Singleton):
 
     @property
     def _measure(self):
-        return 0
+        return S.Zero
 
     def _contains(self, other):
         return false
@@ -2103,8 +2111,8 @@ class FiniteSet(Set):
         return Max(*self)
 
     @property
-    def measure(self):
-        return 0
+    def _measure(self):
+        return S.Zero
 
     def _kind(self):
         if not self.args:
@@ -2242,6 +2250,10 @@ class SymmetricDifference(Set):
         if all(arg.is_iterable for arg in self.args):
             return True
 
+    @property
+    def _measure(self):
+        raise NotImplementedError("Measure for unevaluated `SymmetricDifference` is undefined")
+
     def __iter__(self):
 
         args = self.args
@@ -2317,6 +2329,10 @@ class DisjointUnion(Set):
             if not set_i.is_empty:
                 iter_flag = iter_flag and set_i.is_iterable
         return iter_flag
+
+    @property
+    def _measure(self):
+        return sum(s._measure for s in self.sets)
 
     def _eval_rewrite_as_Union(self, *sets, **kwargs):
         """

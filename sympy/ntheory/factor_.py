@@ -1110,7 +1110,7 @@ rho_msg = "Pollard's rho with retries %i, max_steps %i and seed %i"
 pm1_msg = "Pollard's p-1 with smoothness bound %i and seed %i"
 ecm_msg = "Elliptic Curve with B1 bound %i, B2 bound %i, num_curves %i"
 factor_msg = '\t%i ** %i'
-fermat_msg = 'Close factors satisying Fermat condition found.'
+fermat_msg = 'Close factors satisfying Fermat condition found.'
 complete_msg = 'Factorization is complete.'
 
 
@@ -1624,9 +1624,9 @@ def factorint(n, limit=None, use_trial=True, use_rho=True, use_pm1=True,
             break
         low, high = high, high*2
 
-    B1 = 10000
+    B1 = 500
     B2 = 100*B1
-    num_curves = 50
+    num_curves = 4
     while(1):
         if verbose:
             print(ecm_msg % (B1, B2, num_curves))
@@ -1645,6 +1645,7 @@ def factorint(n, limit=None, use_trial=True, use_rho=True, use_pm1=True,
             if _check_termination(factors, n, limit, use_trial,
                                   use_rho, use_pm1, verbose, next_p):
                 return factors
+            continue
         B1 *= 5
         B2 = 100*B1
         num_curves *= 4

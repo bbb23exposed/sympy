@@ -364,21 +364,25 @@ class bessely(BesselBase):
         c, e = arg.as_coeff_exponent(x)
 
         if e.is_positive:
-            term_one = ((2/pi)*log(z/2)*besselj(nu, z))
-            term_two = -(z/2)**(-nu)*factorial(nu - 1)/pi if (nu).is_positive else S.Zero
-            term_three = -(z/2)**nu/(pi*factorial(nu))*(digamma(nu + 1) - S.EulerGamma)
-            arg = Add(*[term_one, term_two, term_three]).as_leading_term(x, logx=logx)
-            return arg
+            # Refer https://functions.wolfram.com/Bessel-TypeFunctions/BesselY/06/01/04/01/03/
+            if nu.is_zero:
+                term = 2*(log(z/2) + S.EulerGamma)/pi
+            elif nu.is_nonzero:
+                term = -gamma(Abs(nu))*(z/2)**(-Abs(nu))/pi
+            else:
+                raise NotImplementedError(f"Cannot proceed without knowing if {nu} is zero or not.")
+
+            return term.as_leading_term(x, logx=logx)
         elif e.is_negative:
             cdir = 1 if cdir == 0 else cdir
             sign = c*cdir**e
             if not sign.is_negative:
                 # Refer Abramowitz and Stegun 1965, p. 364 for more information on
                 # asymptotic approximation of bessely function.
-                return sqrt(2)*(-sin(pi*nu/2 - z + pi/4) + 3*cos(pi*nu/2 - z + pi/4)/(8*z))*sqrt(1/z)/sqrt(pi)
+               return sqrt(2)*(-sin(pi*nu/2 - z + pi/4) + 3*cos(pi*nu/2 - z + pi/4)/(8*z))*sqrt(1/z)/sqrt(pi)
             return self
-
-        return super(bessely, self)._eval_as_leading_term(x, logx=logx, cdir=cdir)
+        else:
+            return self.func(nu, arg)
 
     def _eval_is_extended_real(self):
         nu, z = self.args
@@ -398,39 +402,49 @@ class bessely(BesselBase):
         except (ValueError, NotImplementedError):
             return self
 
-        if exp.is_positive and nu.is_integer:
-            newn = ceiling(n/exp)
-            bn = besselj(nu, z)
-            a = ((2/pi)*log(z/2)*bn)._eval_nseries(x, n, logx, cdir)
-
-            b, c = [], []
-            o = Order(x**n, x)
+        if exp.is_positive:
             r = (z/2)._eval_nseries(x, n, logx, cdir).removeO()
             if r is S.Zero:
-                return o
-            t = (_mexpand(r**2) + o).removeO()
+                return Order(z**(-nu) + z**nu, x)
 
-            if nu > S.Zero:
-                term = r**(-nu)*factorial(nu - 1)/pi
-                b.append(term)
-                for k in range(1, nu):
-                    denom = (nu - k)*k
-                    if denom == S.Zero:
-                        term *= t/k
-                    else:
-                        term *= t/denom
-                    term = (_mexpand(term) + o).removeO()
+            o = Order(x**n, x)
+            if nu.is_integer:
+                # Reference: https://functions.wolfram.com/Bessel-TypeFunctions/BesselY/06/01/04/01/02/0008/ (only for integer order)
+                newn = ceiling(n/exp)
+                bn = besselj(nu, z)
+                a = ((2/pi)*log(z/2)*bn)._eval_nseries(x, n, logx, cdir)
+                b, c = [], []
+                t = (_mexpand(r**2) + o).removeO()
+
+                if nu > S.Zero:
+                    term = r**(-nu)*factorial(nu - 1)/pi
                     b.append(term)
+                    for k in range(1, nu):
+                        term *= t/((nu - k)*k)
+                        term = (_mexpand(term) + o).removeO()
+                        b.append(term)
 
-            p = r**nu/(pi*factorial(nu))
-            term = p*(digamma(nu + 1) - S.EulerGamma)
-            c.append(term)
-            for k in range(1, (newn + 1)//2):
-                p *= -t/(k*(k + nu))
-                p = (_mexpand(p) + o).removeO()
-                term = p*(digamma(k + nu + 1) + digamma(k + 1))
+                p = r**nu/(pi*factorial(nu))
+                term = p*(digamma(nu + 1) - S.EulerGamma)
                 c.append(term)
-            return a - Add(*b) - Add(*c) # Order term comes from a
+                for k in range(1, (newn + 1)//2):
+                    p *= -t/(k*(k + nu))
+                    p = (_mexpand(p) + o).removeO()
+                    term = p*(digamma(k + nu + 1) + digamma(k + 1))
+                    c.append(term)
+                return a - Add(*b) - Add(*c)  # Order term comes from a
+            elif nu.is_noninteger:
+                # Reference - https://functions.wolfram.com/Bessel-TypeFunctions/BesselY/06/01/04/01/01/0003/
+                newn_a = ceiling((n + nu)/exp)
+                newn_b = ceiling((n - nu)/exp)
+
+                a = [_mexpand(-gamma(nu)*(-1)**k*r**(2*k - nu)/(pi*RisingFactorial(1 - nu, k)*\
+                    factorial(k))) for k in range((newn_a + 1)//2)]
+                b = [_mexpand(-gamma(-nu)*cos(nu*pi)*(-1)**k*r**(2*k + nu)/(pi*RisingFactorial(nu + 1, k)*\
+                    factorial(k))) for k in range((newn_b + 1)//2)]
+                return Add(*a) + Add(*b) + o
+            else:
+                raise NotImplementedError("bessely expansion is only implemented for real order")
 
         return super(bessely, self)._eval_nseries(x, n, logx, cdir)
 
@@ -1519,6 +1533,14 @@ class airyai(AiryBase):
         pf2 = z / (root(3, 3)*gamma(Rational(1, 3)))
         return pf1 * hyper([], [Rational(2, 3)], z**3/9) - pf2 * hyper([], [Rational(4, 3)], z**3/9)
 
+    def _eval_rewrite_as_tractable(self, z, limitvar=None, **kwargs):
+        from sympy.series.limits import limit
+        if limitvar:
+            lim = limit(z, limitvar, S.Infinity)
+            if lim is S.Infinity:
+                return pi**(-Rational(1, 2))*z**(-Rational(1, 4))*exp(-Rational(2, 3)*(z)**(Rational(3, 2)))/2*_airyais(z)
+        return self
+
     def _eval_expand_func(self, **hints):
         arg = self.args[0]
         symbs = arg.free_symbols
@@ -1541,6 +1563,31 @@ class airyai(AiryBase):
                     pf = (d * z**n)**m / (d**m * z**(m*n))
                     newarg = c * d**m * z**(m*n)
                     return S.Half * ((pf + S.One)*airyai(newarg) - (pf - S.One)/sqrt(3)*airybi(newarg))
+
+    def _eval_aseries(self, n, args0, x, logx):
+        # Refer Abramowitz and Stegun 1965, p. 448
+        from sympy.series.order import Order
+
+        point = args0[0]
+        if point is S.Infinity:
+            z = self.args[0]
+            zeta = Rational(2, 3)*(z)**(Rational(3, 2))
+            l = [zeta**(-k)*(-1)**k*gamma(3*k + Rational(1, 2))/(gamma(k + Rational(1, 2))*factorial(k)*(54)**k) \
+                    for k in range(n)] + [Order(1/z**Rational(3*n + 1, 2), x)]
+            return pi**(-Rational(1, 2))*z**(-Rational(1, 4))*exp(-zeta)/2*(Add(*l))._eval_nseries(x, n, logx)
+        elif point is S.NegativeInfinity:
+            z = self.args[0]
+            term1 = (pi)**(-Rational(1, 2))*(-z)**(-Rational(1, 4))
+            zeta = Rational(2, 3)*(-z)**(Rational(3, 2))
+            term2 = sin(zeta + pi/4)
+            p = [zeta**(-2*k)*(-1)**k*gamma(6*k + Rational(1, 2))/(gamma(2*k + \
+                Rational(1, 2))*factorial(2*k)*(54)**(2*k)) for k in range(n)]
+            term3 = cos(zeta + pi/4)
+            q = [zeta**(-2*k - 1)*(-1)**k*gamma(6*k + Rational(7, 2))/(gamma(2*k + \
+                Rational(3, 2))*factorial(2*k + 1)*(54)**(2*k + 1)) for k in range(n)]
+            return term1*(term2*Add(*p)+term3*Add(*q)) + Order(1/z**(n), x)
+
+        return super()._eval_aseries(n, args0, x, logx)
 
 
 class airybi(AiryBase):
@@ -1696,6 +1743,14 @@ class airybi(AiryBase):
         pf2 = z*root(3, 6) / gamma(Rational(1, 3))
         return pf1 * hyper([], [Rational(2, 3)], z**3/9) + pf2 * hyper([], [Rational(4, 3)], z**3/9)
 
+    def _eval_rewrite_as_tractable(self, z, limitvar=None, **kwargs):
+        from sympy.series.limits import limit
+        if limitvar:
+            lim = limit(z, limitvar, S.Infinity)
+            if lim is S.Infinity:
+                return pi**(-Rational(1, 2))*z**(-Rational(1, 4))*exp(Rational(2, 3)*(z)**(Rational(3, 2)))*_airybis(z)
+        return self
+
     def _eval_expand_func(self, **hints):
         arg = self.args[0]
         symbs = arg.free_symbols
@@ -1718,6 +1773,31 @@ class airybi(AiryBase):
                     pf = (d * z**n)**m / (d**m * z**(m*n))
                     newarg = c * d**m * z**(m*n)
                     return S.Half * (sqrt(3)*(S.One - pf)*airyai(newarg) + (S.One + pf)*airybi(newarg))
+
+    def _eval_aseries(self, n, args0, x, logx):
+        # Refer Abramowitz and Stegun 1965, p. 449
+        from sympy.series.order import Order
+
+        point = args0[0]
+        if point is S.Infinity:
+            z = self.args[0]
+            zeta = Rational(2, 3)*(z)**(Rational(3, 2))
+            l = [zeta**(-k)*gamma(3*k + Rational(1, 2))/(gamma(k + Rational(1, 2))*factorial(k)*(54)**k) \
+                    for k in range(n)] + [Order(1/z**Rational(3*n + 1, 2), x)]
+            return pi**(-Rational(1, 2))*z**(-Rational(1, 4))*exp(zeta)*(Add(*l))._eval_nseries(x, n, logx)
+        if point is S.NegativeInfinity:
+            z = self.args[0]
+            term1 = (pi)**(-Rational(1, 2))*(-z)**(-Rational(1, 4))
+            zeta = Rational(2, 3)*(-z)**(Rational(3, 2))
+            term2 = cos(zeta + pi/4)
+            p = [zeta**(-2*k)*(-1)**k*gamma(6*k + Rational(1, 2))/(gamma(2*k + \
+                Rational(1, 2))*factorial(2*k)*(54)**(2*k)) for k in range(n)]
+            term3 = sin(zeta + pi/4)
+            q = [zeta**(-2*k - 1)*(-1)**k*gamma(6*k + Rational(7, 2))/(gamma(2*k + \
+                Rational(3, 2))*factorial(2*k + 1)*(54)**(2*k + 1)) for k in range(n)]
+            return term1*(term2*Add(*p)+term3*Add(*q)) + Order(1/z**(n), x)
+
+        return super()._eval_aseries(n, args0, x, logx)
 
 
 class airyaiprime(AiryBase):
@@ -2202,6 +2282,69 @@ class _besselk(DefinedFunction):
 
     def _eval_nseries(self, x, n, logx, cdir=0):
         x0 = self.args[0].limit(x, 0)
+        if x0.is_zero:
+            f = self._eval_rewrite_as_intractable(*self.args)
+            return f._eval_nseries(x, n, logx)
+        return super()._eval_nseries(x, n, logx)
+
+
+class _airyais(Function):
+    """
+    Helper function to make the $\\mathrm{Airyai}(z)$
+    function tractable for the Gruntz algorithm.
+
+    """
+
+
+    def _eval_aseries(self, n, args0, x, logx):
+        from sympy.series.order import Order
+
+        point = args0[0]
+        if point is S.Infinity:
+            z = self.args[0]
+            zeta = Rational(2, 3)*(z)**(Rational(3, 2))
+            l = [zeta**(-k)*(-1)**k*gamma(3*k + Rational(1, 2))/(gamma(k + Rational(1, 2))*factorial(k)*(54)**k) for k in range(n)] + [Order(1/z**Rational(3*n, 2), x)]
+            return (Add(*l))._eval_nseries(x, n, logx)
+
+        return super()._eval_aseries(n, args0, x, logx)
+
+    def _eval_rewrite_as_intractable(self, x):
+        return 2*airyai(x)*exp(2*x**Rational(3, 2)/3)/sqrt(pi*sqrt(x))
+
+    def _eval_nseries(self, x, n, logx, cdir=0):
+        x0 = self.args[0].limit(x, 0, "-" if cdir == -1 else "+")
+        if x0.is_zero:
+            f = self._eval_rewrite_as_intractable(*self.args)
+            return f._eval_nseries(x, n, logx)
+        return super()._eval_nseries(x, n, logx)
+
+
+class _airybis(Function):
+    """
+    Helper function to make the $\\mathrm{Airybi}(z)$
+    function tractable for the Gruntz algorithm.
+
+    """
+
+
+    def _eval_aseries(self, n, args0, x, logx):
+        from sympy.series.order import Order
+
+        point = args0[0]
+        if point is S.Infinity:
+            z = self.args[0]
+            zeta = Rational(2, 3)*(z)**(Rational(3, 2))
+            l = [zeta**(-k)*(-1)**k*gamma(3*k + Rational(1, 2))/(gamma(k + Rational(1, 2))*factorial(k)*(54)**k) \
+                    for k in range(n)] + [Order(1/z**Rational(3*n + 1, 2), x)]
+            return (Add(*l))._eval_nseries(x, n, logx)
+
+        return super()._eval_aseries(n, args0, x, logx)
+
+    def _eval_rewrite_as_intractable(self, x):
+        return airybi(x)*exp(-2*x**Rational(3, 2)/3)/sqrt(pi*sqrt(x))
+
+    def _eval_nseries(self, x, n, logx, cdir=0):
+        x0 = self.args[0].limit(x, 0, "-" if cdir == -1 else "+")
         if x0.is_zero:
             f = self._eval_rewrite_as_intractable(*self.args)
             return f._eval_nseries(x, n, logx)

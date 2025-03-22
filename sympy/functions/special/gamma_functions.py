@@ -216,12 +216,16 @@ class gamma(DefinedFunction):
 
     def _eval_aseries(self, n, args0, x, logx):
         # Refer: https://functions.wolfram.com/GammaBetaErf/Gamma/06/02/0003/
+        from sympy.functions.combinatorial.numbers import bernoulli
+        z = self.args[0]
         point = args0[0]
-        if point in [S.Infinity, S.NegativeInfinity]:
-            z = self.args[0]
-            r = exp((log(z)*(z - S.Half) - z + log(2*pi)/2).expand())
-            l = [bernoulli(2*k) / (2*k*(2*k - 1)*z**(2*k - 1)) for k in range(1, n)]
-            return (exp(Add(*l))._eval_nseries(x, n, logx))*r
+
+        if point in (S.Infinity, S.NegativeInfinity):
+            coeff = exp((log(z)*(z - S.Half) - z + log(2*pi)/2).expand())
+            expressions = [bernoulli(2*k) / (2*k*(2*k - 1)*z**(2*k - 1)) for k in range(1, n)]
+
+            return (exp(Add(*expressions))._eval_nseries(x, n, logx))*coeff
+
         return super()._eval_aseries(n, args0, x, logx)
 
 

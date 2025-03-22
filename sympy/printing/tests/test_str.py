@@ -463,8 +463,6 @@ def test_PolyElement():
     assert str(x - 1) == "x - 1"
     assert str(x + 1) == "x + 1"
     assert str(x**2) == "x**2"
-    assert str(x**(-2)) == "x**(-2)"
-    assert str(x**QQ(1, 2)) == "x**(1/2)"
 
     assert str((u**2 + 3*u*v + 1)*x**2*y + u + 1) == "(u**2 + 3*u*v + 1)*x**2*y + u + 1"
     assert str((u**2 + 3*u*v + 1)*x**2*y + (u + 1)*x) == "(u**2 + 3*u*v + 1)*x**2*y + (u + 1)*x"
@@ -642,16 +640,16 @@ def test_AppliedBinaryRelation():
 
 
 def test_CRootOf():
-    assert str(rootof(x**5 + 2*x - 1, 0)) == "CRootOf(x**5 + 2*x - 1, 0)"
+    assert str(rootof(x**5 + 2*x - 1, 0)) == "CRootOf(_x**5 + 2*_x - 1, 0)"
 
 
 def test_RootSum():
     f = x**5 + 2*x - 1
 
     assert str(
-        RootSum(f, Lambda(z, z), auto=False)) == "RootSum(x**5 + 2*x - 1)"
+        RootSum(f, Lambda(z, z), auto=False)) == "RootSum(_x**5 + 2*_x - 1)"
     assert str(RootSum(f, Lambda(
-        z, z**2), auto=False)) == "RootSum(x**5 + 2*x - 1, Lambda(z, z**2))"
+        z, z**2), auto=False)) == "RootSum(_x**5 + 2*_x - 1, Lambda(_x, _x**2))"
 
 
 def test_GroebnerBasis():

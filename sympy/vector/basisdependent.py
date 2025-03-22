@@ -9,6 +9,7 @@ from sympy.integrals.integrals import Integral
 from sympy.polys.polytools import factor as fctr
 from sympy.core import S, Add, Mul
 from sympy.core.expr import Expr
+from sympy.series.limits import limit
 
 if TYPE_CHECKING:
     from sympy.vector.vector import BaseVector
@@ -179,6 +180,12 @@ class BasisDependent(Expr):
                            for x in self.components]
         return self._add_func(*doit_components)
 
+    def limit(self, *args, **kwargs):
+        """Calls limit() on each component"""
+        limit_components = [limit(v, *args, **kwargs) * k for
+                           k, v in self.components.items()]
+        return self._add_func(*limit_components)
+
 
 class BasisDependentAdd(BasisDependent, Add):
     """
@@ -245,7 +252,7 @@ class BasisDependentMul(BasisDependent, Mul):
 
     @classmethod
     def _new(cls, *args, **options):
-        from sympy.vector import Cross, Dot, Curl, Gradient
+        from sympy.vector import Cross, Dot, Curl, Gradient, Vector
         count = 0
         measure_number = S.One
         zeroflag = False
@@ -269,6 +276,13 @@ class BasisDependentMul(BasisDependent, Mul):
                 expr = arg
             elif isinstance(arg, (Cross, Dot, Curl, Gradient)):
                 extra_args.append(arg)
+            elif isinstance(arg, Vector):
+                try:
+                    arg.components
+                except AttributeError as exc:
+                    raise ValueError(
+                        "Invalid vector definition, object does not have components."
+                    ) from exc
             else:
                 measure_number *= arg
         # Make sure incompatible types weren't multiplied

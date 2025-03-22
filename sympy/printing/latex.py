@@ -1076,7 +1076,12 @@ class LatexPrinter(Printer):
 
     def _print_log(self, expr, exp=None):
         if not self._settings["ln_notation"]:
-            tex = r"\log{\left(%s \right)}" % self._print(expr.args[0])
+            if len(expr.args) == 2:
+                argument = self._print(expr.args[0])
+                base = self._print(expr.args[1])
+                tex = r"\log_%s{\left(%s \right)}" % (base, argument)
+            else:
+                tex = r"\log{\left(%s \right)}" % self._print(expr.args[0])
         else:
             tex = r"\ln{\left(%s \right)}" % self._print(expr.args[0])
 
@@ -1686,10 +1691,9 @@ class LatexPrinter(Printer):
         return tex % r" \\".join(ecpairs)
 
     def _print_matrix_contents(self, expr):
-        lines = []
 
-        for line in range(expr.rows):  # horrible, should be 'rows'
-            lines.append(" & ".join([self._print(i) for i in expr[line, :]]))
+        # horrible, should be 'rows'
+        lines = [" & ".join([self._print(i) for i in expr[line, :]]) for line in range(expr.rows)]
 
         mat_str = self._settings['mat_str']
         if mat_str is None:
@@ -1979,10 +1983,8 @@ class LatexPrinter(Printer):
         )
 
     def _print_TensAdd(self, expr):
-        a = []
         args = expr.args
-        for x in args:
-            a.append(self.parenthesize(x, precedence(expr)))
+        a = [self.parenthesize(x, precedence(expr)) for x in args]
         a.sort()
         s = ' + '.join(a)
         s = s.replace('+ -', '- ')

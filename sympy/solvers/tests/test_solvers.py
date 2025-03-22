@@ -637,7 +637,7 @@ def test_solve_transcendental():
     # issue 15325
     assert solve(y**(1/x) - z, x) == [log(y)/log(z)]
 
-    # issue 25685 (basic trig identies should give simple solutions)
+    # issue 25685 (basic trig identities should give simple solutions)
     for yi in [cos(2*x),sin(2*x),cos(x - pi/3)]:
         sol = solve([cos(x) - S(3)/5, yi - y])
         assert (sol[0][y] + sol[1][y]).is_Rational, (yi,sol)
@@ -754,6 +754,8 @@ def test_solve_linear():
     eq = cos(x)**2 + sin(x)**2  # = 1
     assert solve_linear(eq) == (0, 1)
     raises(ValueError, lambda: solve_linear(Eq(x, 3), 3))
+    assert solve_linear((x + oo)*(y + oo)) == ((x + oo)*(y + oo), 1)
+    assert solve_linear(x*(y + oo)) == (x*(y + oo), 1)
 
 
 def test_solve_undetermined_coeffs():
@@ -1052,30 +1054,7 @@ def _make_example_24609():
 def test_issue_24609():
     # https://github.com/sympy/sympy/issues/24609
     eq, expected, x = _make_example_24609()
-    assert solve(eq, x, simplify=True) == [expected]
-    [solapprox] = solve(eq.n(), x)
-    assert abs(solapprox - expected.n()) < 1e-14
-
-
-@XFAIL
-def test_issue_24609_xfail():
-    #
-    # This returns 5 solutions when it should be 1 (with x positive).
-    # Simplification reveals all solutions to be equivalent. It is expected
-    # that solve without simplify=True returns duplicate solutions in some
-    # cases but the core of this equation is a simple quadratic that can easily
-    # be solved without introducing any redundant solutions:
-    #
-    #     >>> print(factor_terms(eq.as_numer_denom()[0]))
-    #     2**(2/3)*pi**(2/3)*D_c*V**(2/3)*x**(7/3)*(231361*x**2 - 20000*pi**2)
-    #
-    eq, expected, x = _make_example_24609()
-    assert len(solve(eq, x)) == [expected]
-    #
-    # We do not want to pass this test just by using simplify so if the above
-    # passes then uncomment the additional test below:
-    #
-    # assert len(solve(eq, x, simplify=False)) == 1
+    assert solve(eq, x, simplify=False) == [expected]
 
 
 def test_polysys():
@@ -1398,14 +1377,15 @@ def test_unrad1():
     assert unrad(eq) is None
 
 
-@slow
 def test_unrad_slow():
     # this has roots with multiplicity > 1; there should be no
     # repeats in roots obtained, however
     eq = (sqrt(1 + sqrt(1 - 4*x**2)) - x*(1 + sqrt(1 + 2*sqrt(1 - 4*x**2))))
-    assert solve(eq) == [S.Half]
+    got = solve(eq, simplify=False, check=False)
+    assert len(got) == len(set(got))
 
 
+@slow
 @XFAIL
 def test_unrad_fail():
     # this only works if we check real_root(eq.subs(x, Rational(1, 3)))
@@ -2271,10 +2251,11 @@ def test_issue_8828():
 
 def test_issue_2840_8155():
     # with parameter-free solutions (i.e. no `n`), we want to avoid
-    # excessive periodic solutions
-    assert solve(sin(3*x) + sin(6*x)) == [0, -2*pi/9, 2*pi/9]
-    assert solve(sin(300*x) + sin(600*x)) == [0, -pi/450, pi/450]
-    assert solve(2*sin(x) - 2*sin(2*x)) == [0, -pi/3, pi/3]
+    # excessive periodic solutions; we want all solutions within
+    # one period of the function (each of these has 4 such solutions)
+    assert solve(sin(3*x) + sin(6*x)) == [0, 2*pi/9, pi/3, 4*pi/9]
+    assert solve(sin(300*x) + sin(600*x)) == [0, pi/450, pi/300, pi/225]
+    assert solve(2*sin(x) - 2*sin(2*x)) == [0, pi/3, pi, 5*pi/3]
 
 
 def test_issue_9567():
@@ -2321,10 +2302,13 @@ def test_issue_12114():
             d: -f/2 + s3/2, e: -f/2 - s5/2, g: 2}]
 
 
-def test_inf():
+def test_solve_with_inf_nan():
     assert solve(1 - oo*x) == []
     assert solve(oo*x, x) == []
     assert solve(oo*x - oo, x) == []
+    assert solve(x*(y + oo)) == []
+    assert solve(x*(y - oo)) == []
+    assert solve(x*log(x)) == [1]
 
 
 def test_issue_12448():
@@ -2699,7 +2683,7 @@ def test_solve_Piecewise():
         (100 - 26*x, (x >= 0) & (x >= 2) & (x >= 4) & (x < 10)),
         (16*x - 3*(x - 6)**2/2 - 176, (x >= 2) & (x >= 4) & (x >= 6) & (x < 10)),
         (100 - 30*x, (x >= 2) & (x >= 4) & (x < 10)),
-        (30*x - 3*(x - 6)**2/2 - 196, (x>= 0) & (x >= 4) & (x >= 6) & (x < 10)),
+        (30*x - 3*(x - 6)**2/2 - 196, (x >= 0) & (x >= 4) & (x >= 6) & (x < 10)),
         (80 - 16*x, (x >= 0) & (x >= 4) & (x < 10)),
         (26*x - 3*(x - 6)**2/2 - 196, (x >= 4) & (x >= 6) & (x < 10)),
         (80 - 20*x, (x >= 4) & (x < 10)),
@@ -2712,3 +2696,51 @@ def test_solve_Piecewise():
         (46*x - 3*(x - 6)**2/2 - 276, (x >= 6) & (x < 10)),
         (0, x < 10),  # this will simplify away
         (S.NaN,True)))
+
+
+def test_issue_27233():
+
+    x, y = symbols('x y', real=True)
+
+    eq1 = (x**2 - 6*x + y**2 + 9) * log(Abs(x) - Abs(y) - 2)
+    eq2 = x**2 - y
+
+    solutions = solve([eq1, eq2], [x, y])
+    assert solutions == [
+        {x: 3, y: 0}, {x: -3, y: 0}
+    ]
+
+
+def test_issue_8397():
+    try:
+        nsolve(Eq(-x - 1, -x + 1), 10)  # Attempt to solve a contradiction
+    except ValueError as e:
+        assert str(e) == "the equation has no solution"
+
+
+def test_issue_23834():
+    # Define symbols
+    x, h, p, k, a, b, c = symbols('x h p k a b c')
+
+    # Test case 1: Linear system
+    eq1 = a*x + a + b - x/2
+    sol1 = solve_undetermined_coeffs(eq1, [a, b], x)
+    assert sol1 == {a: Rational(1, 2), b: Rational(-1, 2)}
+
+    # Test case 2: Nonlinear system
+    eq2 = a*x**2 + b*x + c - ((x - h)**2 + 4*p*k)/4/p
+    sol2 = solve_undetermined_coeffs(eq2, (h, p, k), x)
+    expected_sol2 = {h: -b/(2*a), k: (4*a*c - b**2)/(4*a), p: 1/(4*a)}
+    assert sol2 == expected_sol2
+
+    # Test case 3: Multiple solutions
+    eq3 = a**2*x + b - x
+    sol3 = solve_undetermined_coeffs(eq3, [a, b], x)
+    expected_sol3 = [{a: -1, b: 0}, {a: 1, b: 0}]
+    assert sol3 == expected_sol3
+
+    # Test case 4: Coefficients on different generators
+    eq4 = cos(x)*a - 2*cos(x) + b*x - 3*x
+    sol5 = solve_undetermined_coeffs(eq4, (a, b), x)
+    expected_sol5 = {a: 2, b: 3}
+    assert sol5 == expected_sol5

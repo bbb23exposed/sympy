@@ -651,9 +651,9 @@ def solve(f, *symbols, **flags):
         -(3*sqrt(69)/2 + 27/2)**(1/3)/3 -
         1/(3*sqrt(69)/2 + 27/2)**(1/3)]
         >>> solve(x**3 - x + 1, cubics=False)
-        [CRootOf(x**3 - x + 1, 0),
-         CRootOf(x**3 - x + 1, 1),
-         CRootOf(x**3 - x + 1, 2)]
+        [CRootOf(_x**3 - _x + 1, 0),
+         CRootOf(_x**3 - _x + 1, 1),
+         CRootOf(_x**3 - _x + 1, 2)]
 
     If the expression is multivariate, no solution might be returned:
 
@@ -689,11 +689,11 @@ def solve(f, *symbols, **flags):
         >>> from sympy import real_root, S
         >>> eq = root(x, 3) - root(x, 5) + S(1)/7
         >>> solve(eq)  # this gives 2 solutions but misses a 3rd
-        [CRootOf(7*x**5 - 7*x**3 + 1, 1)**15,
-        CRootOf(7*x**5 - 7*x**3 + 1, 2)**15]
+        [CRootOf(7*_x**5 - 7*_x**3 + 1, 1)**15,
+        CRootOf(7*_x**5 - 7*_x**3 + 1, 2)**15]
         >>> sol = solve(eq, check=False)
-        >>> [abs(eq.subs(x,i).n(2)) for i in sol]
-        [0.48, 0.e-110, 0.e-110, 0.052, 0.052]
+        >>> sorted(abs(eq.subs(x,i).n(2)) for i in sol)
+        [0.e-110, 0.e-110, 0.052, 0.052, 0.48]
 
     The first solution is negative so ``real_root`` must be used to see that it
     satisfies the expression:
@@ -797,7 +797,7 @@ def solve(f, *symbols, **flags):
             Allows ``solve`` to return a solution for a pattern in terms of
             other functions that contain that pattern; this is only
             needed if the pattern is inside of some invertible function
-            like cos, exp, ect.
+            like cos, exp, etc.
         particular=True (default is False)
             Instructs ``solve`` to try to find a particular solution to
             a linear system with as many zeros as possible; this is very
@@ -959,6 +959,8 @@ def solve(f, *symbols, **flags):
 
         # rewrite hyperbolics in terms of exp if they have symbols of
         # interest
+
+        # when w = sinh(x), w.has_free(*(Derivative(y(x), x))) is false
         f[i] = f[i].replace(lambda w: isinstance(w, HyperbolicFunction) and \
             w.has_free(*symbols), lambda w: w.rewrite(exp))
 
@@ -1311,6 +1313,14 @@ def _solve(f, *symbols, **flags):
 
     not_impl_msg = "No algorithms are implemented to solve equation %s"
 
+
+    # don't allow solutions when there are added or multiplied infinities
+    for m in Mul.make_args(f):
+        for a in Add.make_args(m):
+            for _ in Mul.make_args(a):
+                if _ in _illegal:
+                    return []
+
     if len(symbols) != 1:
         # look for solutions for desired symbols that are independent
         # of symbols already solved for, e.g. if we solve for x = y
@@ -1376,15 +1386,34 @@ def _solve(f, *symbols, **flags):
     # captured here (for reference below) in case flag value changes
     flags['check'] = checkdens = check = flags.pop('check', True)
 
+    if f.is_Add:
+        # give it a light touch of factoring
+        _f = factor_terms(f)
+        # only keep if it identified more than 1 factor with symbol
+        if _f.is_Mul:
+            hit = False
+            for i in _f.args:
+                if i.has_free(symbol):
+                    if hit:
+                        f = _f
+                        break
+                    hit = True
+
     # build up solutions if f is a Mul
     if f.is_Mul:
         result = set()
         for m in f.args:
-            if m in {S.NegativeInfinity, S.ComplexInfinity, S.Infinity}:
-                result = set()
-                break
-            soln = _vsolve(m, symbol, **flags)
-            result.update(set(soln))
+            soln = set(_vsolve(m, symbol, **flags)) - result
+            reject = set()
+            if check:
+                # we must also check solution in f in
+                # case there are values at which functions cannot be
+                # evaluated (like x=0 in equation with log(x))
+                for s in soln:
+                    if checksol(f, {symbol: s}, **flags) is False:
+                        reject.add(s)
+                        break
+            result.update(soln - reject)
         result = [{symbol: v} for v in result]
         if check:
             # all solutions have been checked but now we must
@@ -1431,7 +1460,7 @@ def _solve(f, *symbols, **flags):
                     if _eval_simplify is not None:
                         # unconditionally take the simplification of v
                         v = _eval_simplify(ratio=2, measure=lambda x: 1)
-                except TypeError:
+                except (TypeError, ValueError):
                     # incompatible type with condition(s)
                     continue
                 if v == False:
@@ -1633,6 +1662,8 @@ def _solve(f, *symbols, **flags):
                     # or high-order EX domain.
                     try:
                         soln = poly.all_roots()
+                        if any(isinstance(root , log) for root in soln):
+                            return soln
                     except NotImplementedError:
                         if not flags.get('incomplete', True):
                                 raise NotImplementedError(
@@ -1770,10 +1801,8 @@ def _solve_system(exprs, symbols, **flags):
         E = []
         sym_indices = {sym: i for i, sym in enumerate(symbols)}
         for n, e1 in enumerate(exprs):
-            for e2 in exprs[:n]:
-                # Equations are connected if they share a symbol
-                if exprsyms[e1] & exprsyms[e2]:
-                    E.append((e1, e2))
+            # Equations are connected if they share a symbol
+            E.extend((e1, e2) for e2 in exprs[:n] if exprsyms[e1] & exprsyms[e2])
         G = V, E
         subexprs = connected_components(G)
         if len(subexprs) > 1:
@@ -1791,11 +1820,11 @@ def _solve_system(exprs, symbols, **flags):
                 if not isinstance(subsol, list):
                     subsol = [subsol]
                 subsols.append(subsol)
+
             # Full solution is cartesion product of subsystems
-            sols = []
-            for soldicts in product(*subsols):
-                sols.append(dict(item for sd in soldicts
-                    for item in sd.items()))
+            sols = [dict(item for sd in soldicts
+                    for item in sd.items()) for soldicts in product(*subsols)]
+
             return linear, sols
 
     polys = []
@@ -2184,9 +2213,11 @@ def solve_linear(lhs, rhs=0, symbols=[], exclude=[]):
         if dnewn_dxi and (not free or any(dnewn_dxi.diff(s) for s in free) or free == symbols):
             all_zero = False
             if dnewn_dxi is S.NaN:
-                break
+                break  # not going to handle
             if xi not in dnewn_dxi.free_symbols:
                 vi = -1/dnewn_dxi*(newn.subs(xi, 0))
+                if vi is S.NaN:
+                    break  # not going to handle
                 if dens is None:
                     dens = _simple_dens(eq, symbols)
                 if not any(checksol(di, {xi: vi}, minimal=True) is True
@@ -2432,6 +2463,7 @@ def solve_undetermined_coeffs(equ, coeffs, *syms, **flags):
         # -(exp(x) + y), A*exp(x) + B
         # then see what symbols are common to both
         # {x} = {x, A, B} - {x, y}
+        # Separate terms dependent and independent of coefficients
         ind, dep = xeq.as_independent(*coeffs, as_Add=True)
         dfree = dep.free_symbols
         syms = dfree & ind.free_symbols
@@ -2454,9 +2486,7 @@ def solve_undetermined_coeffs(equ, coeffs, *syms, **flags):
     gens = set(xeq.as_coefficients_dict(*syms).keys()) - {1}
     cset = set(coeffs)
     if any(g.has_xfree(cset) for g in gens):
-        return  # a generator contained a coefficient symbol
-
-    # make sure we are working with symbols for generators
+        return None  # A generator contained a coefficient symbol
 
     e, gens, _ = recast_to_symbols([xeq], list(gens))
     xeq = e[0]
@@ -2469,12 +2499,18 @@ def solve_undetermined_coeffs(equ, coeffs, *syms, **flags):
 
     soln = solve(system, coeffs, **flags)
 
-    # unpack unless told otherwise if length is 1
-
-    settings = flags.get('dict', None) or flags.get('set', None)
-    if type(soln) is dict or settings or len(soln) != 1:
+    # Handle output format
+    if flags.get('dict', False):
+        if isinstance(soln, dict):
+            return [soln]
+        elif isinstance(soln, list):
+            return soln if all(isinstance(s, dict) for s in soln) else [dict(zip(coeffs, s)) for s in soln]
+        else:
+            return [{}]
+    elif isinstance(soln, list) and len(soln) == 1:
+        return soln[0]
+    else:
         return soln
-    return soln[0]
 
 
 def solve_linear_system_LU(matrix, syms):
@@ -3059,6 +3095,11 @@ def nsolve(*args, dict=False, **kwargs):
             raise TypeError('nsolve cannot accept inequalities')
         syms = f.free_symbols
         if fargs is None:
+            if not syms:
+                if f == 0:
+                    return [] if as_dict else None
+                else:
+                    raise ValueError("the equation has no solution")
             fargs = syms.copy().pop()
         if not (len(syms) == 1 and (fargs in syms or fargs[0] in syms)):
             raise ValueError(filldedent('''

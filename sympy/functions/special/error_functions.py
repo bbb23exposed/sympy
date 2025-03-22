@@ -2214,6 +2214,11 @@ class Shi(TrigonometricIntegral):
         # XXX should we polarify z?
         return (E1(z) - E1(exp_polar(I*pi)*z))/2 - I*pi/2
 
+    def _eval_rewrite_as_Integral(self, z, **kwargs):
+        from sympy.integrals.integrals import Integral
+        t = Dummy(uniquely_named_symbol('t', [z]).name)
+        return Integral(sinh(t) / t, (t, 0, z))
+
     def _eval_is_zero(self):
         z = self.args[0]
         if z.is_zero:
@@ -2232,6 +2237,20 @@ class Shi(TrigonometricIntegral):
         else:
             return self
 
+    def _eval_aseries(self, n, args0, x, logx):
+        from sympy.series.order import Order
+        point = args0[0]
+
+        if point is S.Infinity:
+            z = self.args[0]
+            o = Order(1/z**(n), x)
+
+            p = [factorial(2 *k)/z**(2*k+1) for k in range(n//2+1)] + [o]
+            q = [factorial(2*k+1)/z**(2*(k+1)) for k in range(n//2)] + [o]
+            result =  Add(*q)*sinh(z+o) + Add(*p)*cosh(z+o)
+
+            return result - (I*pi/2)
+        return super()._eval_aseries(n, args0, x, logx)
 
 class Chi(TrigonometricIntegral):
     r"""
@@ -2330,6 +2349,11 @@ class Chi(TrigonometricIntegral):
     def _eval_rewrite_as_expint(self, z, **kwargs):
         return -I*pi/2 - (E1(z) + E1(exp_polar(I*pi)*z))/2
 
+    def _eval_rewrite_as_Integral(self, z, **kwargs):
+        from sympy.integrals.integrals import Integral
+        t = Dummy(uniquely_named_symbol('t', [z]).name)
+        return S.EulerGamma + log(z) + Integral((cosh(t) - 1) / t, (t, 0, z))
+
     def _eval_as_leading_term(self, x, logx, cdir):
         arg = self.args[0].as_leading_term(x, logx=logx, cdir=cdir)
         arg0 = arg.subs(x, 0)
@@ -2345,6 +2369,24 @@ class Chi(TrigonometricIntegral):
         else:
             return self
 
+    def _eval_aseries(self, n, args0, x, logx):
+        from sympy.series.order import Order
+        point = args0[0]
+        sign=S.One
+
+        if point in (S.Infinity, S.NegativeInfinity):
+            z = self.args[0]
+            o = Order(1/z**(n), x)
+
+            p = [factorial(2*k)/z**(2*k+1) for k in range(n//2+1)] + [o]
+            q = [factorial(2*k+1)/z**(2*(k+1)) for k in range(n//2)] + [o]
+            result =  Add(*q)*cosh(z+o) + Add(*p)*sinh(z+o)
+
+            if point is S.Infinity:
+                sign=S.NegativeOne
+
+            return result + sign*(I*pi/2)
+        return super()._eval_aseries(n, args0, x, logx)
 
 ###############################################################################
 #################### FRESNEL INTEGRALS ########################################

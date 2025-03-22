@@ -57,6 +57,11 @@ def test_bessely_leading_term():
     assert bessely(0, x).as_leading_term(x) == (2*log(x) - 2*log(2) + 2*S.EulerGamma)/pi
     assert bessely(1, sin(x)).as_leading_term(x) == -2/(pi*x)
     assert bessely(1, 2*sqrt(x)).as_leading_term(x) == -1/(pi*sqrt(x))
+    assert bessely(S(5)/3, x).as_leading_term(x) == -2*2**(S(2)/3)*gamma(S(5)/3)/(pi*x**(S(5)/3))
+    assert bessely(1, cos(x)).as_leading_term(x) == bessely(1, 1)
+    assert bessely(3, 1/x).as_leading_term(x) == sqrt(2)*sqrt(x)*(3*x*sin(pi/4 - 1/x)/8 + cos(pi/4 - 1/x))/sqrt(pi)
+    assert bessely(3, 1/sin(x)).as_leading_term(x) == sqrt(2)*(3*sin(x)*sin(pi/4 - 1/sin(x))/8 + \
+            cos(pi/4 - 1/sin(x)))*sqrt(sin(x))/sqrt(pi)
 
 
 def test_besseli_leading_term():
@@ -135,6 +140,18 @@ def test_bessely_series():
         (S(5)/2 - 2*S.EulerGamma)/(2*pi)) + x**(S(5)/2)*(log(x)/(12*pi) - \
         (S(10)/3 - 2*S.EulerGamma)/(12*pi)) + O(x**3*log(x))
     assert bessely(-2, sin(x)).series(x, n=4) == bessely(2, sin(x)).series(x, n=4)
+    assert bessely(2, x**2).series(x) == -4/(pi*x**4) - 1/pi + x**4*(log(x)/(2*pi) - log(2)/(4*pi) - \
+        (S(3)/2 - 2*S.EulerGamma)/(8*pi)) + O(x**6*log(x))
+
+
+def test_bessely_frac_order_series():
+    assert bessely(S(1)/2, x).series(x, n=2) == -sqrt(2)/(sqrt(pi)*sqrt(x)) + sqrt(2)*x**(S(3)/2)/\
+        (2*sqrt(pi)) + O(x**2)
+    assert bessely(S(5)/3, x).series(x, n=2) == -2*2**(S(2)/3)*gamma(S(5)/3)/(pi*x**(S(5)/3)) - 3*2**(S(2)/3)*x**(S(1)/3)\
+        *gamma(S(5)/3)/(4*pi) - 2**(S(1)/3)*x**(S(5)/3)*gamma(-S(5)/3)/(8*pi) + O(x**2)
+    assert bessely(S(1)/2, sqrt(x)).series(x, n=2) == -sqrt(2)/(sqrt(pi)*x**(S(1)/4)) + sqrt(2)*x**(S(3)/4)/\
+        (2*sqrt(pi)) - sqrt(2)*x**(S(7)/4)/(24*sqrt(pi)) + O(x**2)
+    assert bessely(S(1)/2, x**2).series(x, n=2) == -sqrt(2)/(sqrt(pi)*x) + O(x**2)
 
 
 def test_besseli_series():
@@ -654,6 +671,14 @@ def test_airyai():
         -sqrt(3)*(-1 + (z**5)**Rational(1, 3)/z**Rational(5, 3))*airybi(2*3**Rational(1, 3)*z**Rational(5, 3))/6 +
          (1 + (z**5)**Rational(1, 3)/z**Rational(5, 3))*airyai(2*3**Rational(1, 3)*z**Rational(5, 3))/2)
 
+    assert airyai(x).series(x, oo) == (385/(4608*x**3) + 1 - 5*(1/x)**(S(3)/2)/48 - 85085*(1/x)**(S(9)/2)/663552 + \
+            O(x**(-6), (x, oo)))*(1/x)**(S(1)/4)*exp(-2/(3*(1/x)**(S(3)/2)))/(2*sqrt(pi))
+    assert airyai(x).series(x, -oo, n=4) == (-1/x)**(S(1)/4)*((1 + 385/(4608*x**3) + 37182145/(127401984*x**6) + \
+            5849680962125/(1761205026816*x**9))*sin(pi/4 + 2/(3*(-1/x)**(S(3)/2))) + (-1267709431363375*(-1/x)**\
+            (S(21)/2)/84537841287168 + 5391411025*(-1/x)**(S(15)/2)/6115295232 - 85085*(-1/x)**(S(9)/2)/663552 + \
+            5*(-1/x)**(S(3)/2)/48)*cos(pi/4 + 2/(3*(-1/x)**(S(3)/2))))/sqrt(pi) + O(x**(-4), (x, -oo))
+
+
 
 def test_airybi():
     z = Symbol('z', real=False)
@@ -689,6 +714,14 @@ def test_airybi():
     assert expand_func(airybi(2*(3*z**5)**Rational(1, 3))) == (
         sqrt(3)*(1 - (z**5)**Rational(1, 3)/z**Rational(5, 3))*airyai(2*3**Rational(1, 3)*z**Rational(5, 3))/2 +
         (1 + (z**5)**Rational(1, 3)/z**Rational(5, 3))*airybi(2*3**Rational(1, 3)*z**Rational(5, 3))/2)
+
+    assert airybi(x).series(x, oo) == (385/(4608*x**3) + 1 + 5*(1/x)**(S(3)/2)/48 + 85085*(1/x)**(S(9)/2)/663552 + \
+            O(x**(-6), (x, oo)))*(1/x)**(S(1)/4)*exp(2/(3*(1/x)**(S(3)/2)))/sqrt(pi)
+    assert airybi(x).series(x, -oo, n=4) == (-1/x)**(S(1)/4)*((1 + 385/(4608*x**3) + 37182145/(127401984*x**6) + \
+            5849680962125/(1761205026816*x**9))*cos(pi/4 + 2/(3*(-1/x)**(S(3)/2))) + (-1267709431363375*(-1/x)**\
+            (S(21)/2)/84537841287168 + 5391411025*(-1/x)**(S(15)/2)/6115295232 - 85085*(-1/x)**(S(9)/2)/663552 + \
+            5*(-1/x)**(S(3)/2)/48)*sin(pi/4 + 2/(3*(-1/x)**(S(3)/2))))/sqrt(pi) + O(x**(-4), (x, -oo))
+
 
 
 def test_airyaiprime():

@@ -117,7 +117,7 @@ class Dimension(Expr):
 
     For example, in classical mechanics we know that time is different from
     temperature and dimensions make this difference (but they do not provide
-    any measure of these quantites.
+    any measure of these quantities.
 
         >>> from sympy.physics.units import Dimension
         >>> length = Dimension('length')
@@ -534,9 +534,7 @@ class DimensionSystem(Basic, _QuantityMapper):
         Dimensional representation in terms of the canonical base dimensions.
         """
 
-        vec = []
-        for d in self.list_can_dims:
-            vec.append(self.get_dimensional_dependencies(dim).get(d, 0))
+        vec = [self.get_dimensional_dependencies(dim).get(d, 0) for d in self.list_can_dims]
         return Matrix(vec)
 
     def dim_vector(self, dim):

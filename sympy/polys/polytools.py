@@ -21,7 +21,7 @@ from sympy.core.intfunc import ilcm
 from sympy.core.numbers import I, Integer, equal_valued
 from sympy.core.relational import Relational, Equality
 from sympy.core.sorting import ordered
-from sympy.core.symbol import Dummy, Symbol
+from sympy.core.symbol import Dummy, Symbol, symbols
 from sympy.core.sympify import sympify, _sympify
 from sympy.core.traversal import preorder_traversal, bottom_up
 from sympy.logic.boolalg import BooleanAtom
@@ -314,6 +314,40 @@ class Poly(Basic):
         return rep
 
     @classmethod
+    def from_roots(cls, roots, gens=None, domain=None, **args):
+        """Construct a monic polynomial from its roots."""
+
+        roots = [sympify(r) for r in roots]
+
+        if gens is None:
+            gens = symbols('x')
+        if isinstance(gens, Basic):
+            gens = (gens,)
+
+        if domain is None:
+            domain, converted_roots = construct_domain(roots)
+        else:
+            converted_roots = [domain.convert(r) for r in roots]
+
+        coeffs = cls._construct_from_roots_domain(converted_roots, domain)
+
+        return cls(coeffs, *gens, domain=domain, **args)
+
+    @staticmethod
+    def _construct_from_roots_domain(roots, domain):
+        """Low-level implementation using domain elements."""
+
+        n = len(roots)
+        coeffs = [domain.zero] * (n + 1)
+        coeffs[0] = domain.one
+
+        for i in range(n):
+            for j in range(i + 1, 0, -1):
+                coeffs[j] = domain.sub(coeffs[j], domain.mul(roots[i], coeffs[j-1]))
+
+        return coeffs
+
+    @classmethod
     def _from_expr(cls, rep, opt):
         """Construct a polynomial from an expression. """
         rep, opt = _dict_from_expr(rep, opt)
@@ -443,11 +477,6 @@ class Poly(Basic):
         """Return one polynomial with ``self``'s properties. """
         return self.new(self.rep.one(self.rep.lev, self.rep.dom), *self.gens)
 
-    @property
-    def unit(self):
-        """Return unit polynomial with ``self``'s properties. """
-        return self.new(self.rep.unit(self.rep.lev, self.rep.dom), *self.gens)
-
     def unify(f, g):
         """
         Make ``f`` and ``g`` belong to the same domain.
@@ -547,6 +576,7 @@ class Poly(Basic):
         Poly(y + 1, y, domain='ZZ')
 
         """
+        # mnemonic: "per" is the reverse of "rep"
         if gens is None:
             gens = f.gens
 
@@ -2662,6 +2692,13 @@ class Poly(Basic):
          Poly(x**2 - 1, x, domain='ZZ'),
          Poly(-2, x, domain='ZZ')]
 
+        See also
+        ========
+
+        subresultant_polys
+        subresultant_coeffs
+        resultant
+
         """
         _, per, F, G = f._unify(g)
 
@@ -2671,6 +2708,140 @@ class Poly(Basic):
             raise OperationNotSupported(f, 'subresultants')
 
         return list(map(per, result))
+
+    def subresultant_polys(f, g):
+        """
+        Computes the subresultant polynomials of two polynomials ``f`` and ``g``.
+        The returned list has length min(deg(f), deg(g))+1, and is in order of
+        increasing degree. The first polynomial in the list is the resultant.
+
+        This uses the subresultant PRS. The remainder r_i is the deg(r_{i-1})-th
+        subresultant polynomial. Additionally, if deg(r_i) < deg(r_{i-1}) - 1,
+        then the deg(r_i) subresultant polynomial is r_i * LC(r_i) ^ c_i, where
+        c_i = deg(r_{i-1})-deg(r_i)-1.
+
+        Examples
+        ========
+
+        >>> from sympy import Poly
+        >>> from sympy.abc import x
+
+        >>> Poly(x**2 + 1, x).subresultant_polys(Poly(x**2 - 1, x))
+        [Poly(4, x, domain='ZZ'),
+         Poly(-2, x, domain='ZZ'),
+         Poly(x**2 - 1, x, domain='ZZ')]
+
+        Observe that the first element is the resultant.
+
+        >>> Poly(x**2 + 1, x).resultant(Poly(x**2 - 1, x))
+        4
+
+        See also
+        ========
+
+        subresultants
+        subresultant_coeffs
+        resultant
+
+        """
+
+        # ensure deg(f) >= deg(g)
+        n = f.degree()
+        m = g.degree()
+
+        if n < m:
+            f, g = g, f
+            n, m = m, n
+
+        res, prs = f.resultant(g, includePRS=True)
+        if len(prs) <= 1:
+            return []
+
+        subres_polys = [Poly(res, f.gen)]
+
+        if m == 0:
+            return subres_polys
+
+        zero = f.zero
+
+        for i in range(len(prs)-1, 1, -1):
+            p, d = prs[i], prs[i].degree() # r_i and deg(r_i)
+            e = prs[i-1].degree() # deg(r_{i-1})
+
+            # remainder r_i is the deg(r_{i-1})-th subres poly
+            # so we need to first append enough 0s
+            # only if not already computed (happens if deg(f) = deg(g))
+            if len(subres_polys) != e:
+                subres_polys.extend([zero] * (e - len(subres_polys) - 1))
+                subres_polys.append(p)
+
+            # if there is a "degree jump"
+            # if deg(r_i) < deg(r_{i-1}) - 1, then the deg(r_i) subres poly
+            # is r_i * LC(r_i) ^ c_i, where c_i = deg(r_{i-1})-deg(r_i)-1
+            # note bc d <= e, the index is valid
+            jump = e - d - 1
+            if jump > 0 and d != 0:
+                subres_polys[d] = p * p.LC() ** jump
+
+        # should be length m+1 so pad 0s
+        subres_polys.extend([zero] * (m - len(subres_polys)))
+        subres_polys.append(g * g.LC() ** (n - m - 1))
+
+        return subres_polys
+
+    def subresultant_coeffs(f, g):
+        """
+        Computes the subresultant coefficients of two polynomials ``f`` and ``g``.
+        These are sometimes called the principal subresultant coefficients (PSC). The
+        returned list has length min(deg(f), deg(g))+1.
+
+        This uses the subresultant polynomials: the coefficient of the ith subresultant
+        polynomial for x^{i-1} is the ith subresultant coefficient.
+
+        The first k subresultants are zero if ``f`` and ``g`` have k common roots.
+
+        Examples
+        ========
+
+        >>> from sympy import Poly
+        >>> from sympy.abc import x
+
+        >>> Poly(x**2 + 1, x).subresultant_coeffs(Poly(x**2 - 1, x))
+        [4, 0, 1]
+
+        >>> Poly((x-1)*(x-2), x).subresultant_coeffs(Poly((x-1)*(x+2), x))
+        [0, 4, 1]
+
+        The first element is 0, indicating they share one root.
+
+        >>> Poly((x-1)*(x-2), x).subresultant_coeffs(Poly((x-1)*(x-2)*x, x))
+        [0, 0, 1]
+
+        The first two elements are 0, indicating they share two roots.
+
+        The coefficients are taken from the subresultant polynomials.
+
+        >>> Poly((x-1)*(x-2), x).subresultant_polys(Poly((x-1)*(x-2)*x, x))
+        [Poly(0, x, domain='ZZ'),
+        Poly(0, x, domain='ZZ'),
+        Poly(x**2 - 3*x + 2, x, domain='ZZ')]
+
+        The coefficients are, in order, the coefficient of x^0, x^1, and x^2 in
+        the polynomials above.
+
+        See also
+        ========
+
+        subresultants
+        subresultant_polys
+        resultant
+
+        """
+
+        subres_polys = f.subresultant_polys(g)
+        subres_coeffs = [subres_polys[i].nth(i) for i in range(len(subres_polys))]
+
+        return subres_coeffs
 
     def resultant(f, g, includePRS=False):
         """
@@ -3617,7 +3788,7 @@ class Poly(Basic):
         IndexError: root index out of [-3, 2] range, got 3
 
         >>> Poly(x**5 + x + 1).root(0)
-        CRootOf(x**3 - x**2 + 1, 0)
+        CRootOf(_x**3 - _x**2 + 1, 0)
 
         """
         return sympy.polys.rootoftools.rootof(f, index, radicals=radicals)
@@ -3637,7 +3808,7 @@ class Poly(Basic):
         >>> Poly(2*x**3 - 7*x**2 + 4*x + 4).real_roots()
         [-1/2, 2, 2]
         >>> Poly(x**3 + x + 1).real_roots()
-        [CRootOf(x**3 + x + 1, 0)]
+        [CRootOf(_x**3 + _x + 1, 0)]
         """
         reals = sympy.polys.rootoftools.CRootOf.real_roots(f, radicals=radicals)
 
@@ -3661,9 +3832,9 @@ class Poly(Basic):
         >>> Poly(2*x**3 - 7*x**2 + 4*x + 4).all_roots()
         [-1/2, 2, 2]
         >>> Poly(x**3 + x + 1).all_roots()
-        [CRootOf(x**3 + x + 1, 0),
-         CRootOf(x**3 + x + 1, 1),
-         CRootOf(x**3 + x + 1, 2)]
+        [CRootOf(_x**3 + _x + 1, 0),
+         CRootOf(_x**3 + _x + 1, 1),
+         CRootOf(_x**3 + _x + 1, 2)]
 
         """
         roots = sympy.polys.rootoftools.CRootOf.all_roots(f, radicals=radicals)
@@ -3717,11 +3888,12 @@ class Poly(Basic):
         else:
             coeffs = [coeff.evalf(n=n).as_real_imag()
                     for coeff in f.all_coeffs()]
-            try:
-                coeffs = [mpmath.mpc(*coeff) for coeff in coeffs]
-            except TypeError:
-                raise DomainError("Numerical domain expected, got %s" % \
-                        f.rep.dom)
+            with mpmath.workdps(n):
+                try:
+                    coeffs = [mpmath.mpc(*coeff) for coeff in coeffs]
+                except TypeError:
+                    raise DomainError("Numerical domain expected, got %s" % \
+                            f.rep.dom)
 
         dps = mpmath.mp.dps
         mpmath.mp.dps = n
@@ -3922,19 +4094,19 @@ class Poly(Basic):
         >>> f.lift()
         Poly(x**4 - x**2 + 1, x, domain='ZZ')
         >>> f.lift().all_roots()
-        [CRootOf(x**4 - x**2 + 1, 0),
-        CRootOf(x**4 - x**2 + 1, 1),
-        CRootOf(x**4 - x**2 + 1, 2),
-        CRootOf(x**4 - x**2 + 1, 3)]
+        [CRootOf(_x**4 - _x**2 + 1, 0),
+        CRootOf(_x**4 - _x**2 + 1, 1),
+        CRootOf(_x**4 - _x**2 + 1, 2),
+        CRootOf(_x**4 - _x**2 + 1, 3)]
         >>> f.which_all_roots(f.lift().all_roots())
-        [CRootOf(x**4 - x**2 + 1, 0), CRootOf(x**4 - x**2 + 1, 2)]
+        [CRootOf(_x**4 - _x**2 + 1, 0), CRootOf(_x**4 - _x**2 + 1, 2)]
 
         This procedure is already done internally when calling
         `.all_roots()` on a polynomial with algebraic coefficients,
         or polynomials with Gaussian domains.
 
         >>> f.all_roots()
-        [CRootOf(x**4 - x**2 + 1, 0), CRootOf(x**4 - x**2 + 1, 2)]
+        [CRootOf(_x**4 - _x**2 + 1, 0), CRootOf(_x**4 - _x**2 + 1, 2)]
 
         See Also
         ========
@@ -4022,7 +4194,10 @@ class Poly(Basic):
 
     def cancel(f, g, include=False):
         """
-        Cancel common factors in a rational function ``f/g``.
+        Cancel common factors in a rational function ``f/g``, returning
+        ``(p/q, n, d)`` if ``include`` is False, else ``(N, D)`` where
+        ``N/D = (p*n)/(q*d)``, i.e. ``p`` and ``q`` are included in ``N``
+        and ``D``.
 
         Examples
         ========
@@ -4031,7 +4206,7 @@ class Poly(Basic):
         >>> from sympy.abc import x
 
         >>> Poly(2*x**2 - 2, x).cancel(Poly(x**2 - 2*x + 1, x))
-        (1, Poly(2*x + 2, x, domain='ZZ'), Poly(x - 1, x, domain='ZZ'))
+        (2, Poly(x + 1, x, domain='ZZ'), Poly(x - 1, x, domain='ZZ'))
 
         >>> Poly(2*x**2 - 2, x).cancel(Poly(x**2 - 2*x + 1, x), include=True)
         (Poly(2*x + 2, x, domain='ZZ'), Poly(x - 1, x, domain='ZZ'))
@@ -4499,7 +4674,16 @@ class Poly(Basic):
 
     @_sympifyit('g', NotImplemented)
     def __truediv__(f, g):
-        return f.as_expr()/g.as_expr()
+        try:
+            f = f.to_field()
+            g = f.domain.convert(g)
+            return f.per(f.rep * (1 / g))
+        except (CoercionFailed, TypeError):
+            result = f.as_expr() / g.as_expr()
+            if result.is_polynomial():
+                return Poly(result, f.gens, domain=f.domain)
+            else:
+                return result
 
     @_sympifyit('g', NotImplemented)
     def __rtruediv__(f, g):
@@ -5312,6 +5496,105 @@ def half_gcdex(f, g, *gens, **args):
 
 
 @public
+def extended_euclidean_algorithm(f, g):
+    """
+    Generator for all intermediate steps in the extended euclidean algorithm applied to polynomials 'f' and 'g'.
+
+    Description
+    ===========
+
+    Implements the extended euclidean algorithm for polynomials as described in e.g.
+        McEliece, R. J., & Shearer, J. B. (1978).
+        A Property of Euclid's Algorithm and an
+        Application to Pade Approximation.
+        SIAM Journal on Applied Mathematics, 34(4), 611-615.
+        doi:10.1137/0134048
+
+    Given polynomials a and b, the algorithm returns a generator to three polynomial sequences s, t, and r
+    which enumerate all non-trivial (i.e. excluding (s, t, r) = (1, 0, f), (0, 1, g), and (g, -f, 0)) solutions
+    (up to multiplicative constants) to the following conditions:
+        f*s[i] + g*t[i] = r[i],
+        r[i].deg() > r[i + 1].deg()
+
+    In particular, the final value of r = gcd(f, g), the greatest common divisor of f and g.
+
+    The sequences s, t, and r also have the following properties (see McEliece and Shearer, 1978):
+        t[i]*r[i-1] - t[i-1]*r[i] = (-1)**i*f
+        s[i]*r[i-1] - s[i-1]*r[i] = (-1)**(i+1)*g
+        s[i]*t[i-1]- s[i-1]*t[i] = (-1)**(i+1)
+        s[i].degree() + r[i-1].degree() = b.degree()
+        t[i].degree() + r[i-1].degree() = a.degree()
+
+    Parameters
+    ==========
+
+    f : Poly
+        The first polynomial
+    g : Poly
+        The second polynomial
+
+    Returns
+    =======
+
+    generator : Generator[tuple[Poly, Poly, Poly], None, None]
+        A generator to the sequences s, t, and r
+
+    Examples
+    ========
+
+    >>> from sympy.abc import x
+    >>> from sympy import Poly
+    >>> from sympy.polys.polytools import extended_euclidean_algorithm
+
+    >>> f = Poly(x**3 + 2, x)
+    >>> g = Poly(x**2 - 1, x)
+    >>> eea_result = extended_euclidean_algorithm(f, g)
+
+    >>> for s, t, r in eea_result: print(s, t, r)
+    Poly(1, x, domain='ZZ') Poly(-x, x, domain='ZZ') Poly(x + 2, x, domain='ZZ')
+    Poly(-x + 2, x, domain='ZZ') Poly(x**2 - 2*x + 1, x, domain='ZZ') Poly(3, x, domain='ZZ')
+
+    In this case, gcd(f, g) = 3 and we can write 3 = (-x + 2)*f + (x**2 - 2*x + 1)*g
+
+    >>> 3 - (-x + 2)*f - (x**2 - 2*x + 1)*g
+    Poly(0, x, domain='ZZ')
+
+    When two polynomials shape a common factor, the gcd is the common factor
+
+    >>> f = Poly((x + 1)*(x + 2), x)
+    >>> g = Poly((x + 1)*(x + 3), x)
+    >>> eea_result = extended_euclidean_algorithm(f, g)
+    >>> for s, t, r in eea_result: print(s, t, r)
+    Poly(1, x, domain='ZZ') Poly(-1, x, domain='ZZ') Poly(-x - 1, x, domain='ZZ')
+
+    Here, the final value of r is -(x + 1), so this is the gcd of f and g
+    """
+    s1, s2 = f.one, f.zero
+    t1, t2 = f.zero, f.one
+
+    # ensure that a.degree() >= b.degree()
+    if f.degree() < g.degree():
+        f, g = g, f
+        s1, t1 = t1, s1
+        s2, t2 = t2, s2
+
+    r1, r2 = f, g
+
+    # r[-1].deg() is strictly decreasing and is initially equal to at most a.degree()
+    # therefore, the loop terminates in at most a.degree() steps
+    for _ in range(f.degree()):
+        quotient, remainder = divmod(r1, r2)
+        if remainder == 0:
+            break
+
+        r1, r2 = r2, remainder
+        s1, s2 = s2, s1 - quotient * s2
+        t1, t2 = t2, t1 - quotient * t2
+
+        yield s2, t2, r2
+
+
+@public
 def gcdex(f, g, *gens, **args):
     """
     Extended Euclidean algorithm of ``f`` and ``g``.
@@ -5416,6 +5699,13 @@ def subresultants(f, g, *gens, **args):
     >>> subresultants(x**2 + 1, x**2 - 1)
     [x**2 + 1, x**2 - 1, -2]
 
+    See also
+    ========
+
+    subresultant_polys
+    subresultant_coeffs
+    resultant
+
     """
     options.allowed_flags(args, ['polys'])
 
@@ -5425,6 +5715,121 @@ def subresultants(f, g, *gens, **args):
         raise ComputationFailed('subresultants', 2, exc)
 
     result = F.subresultants(G)
+
+    if not opt.polys:
+        return [r.as_expr() for r in result]
+    else:
+        return result
+
+
+@public
+def subresultant_polys(f, g, *gens, **args):
+    """
+    Computes the subresultant polynomials of two polynomials ``f`` and ``g``.
+    The returned list has length min(deg(f), deg(g))+1, and is in order of
+    increasing degree. The first polynomial in the list is the resultant.
+
+    This uses the subresultant PRS. The remainder r_i is the deg(r_{i-1})-th
+    subresultant polynomial. Additionally, if deg(r_i) < deg(r_{i-1}) - 1,
+    then the deg(r_i) subresultant polynomial is r_i * LC(r_i) ^ c_i, where
+    c_i = deg(r_{i-1})-deg(r_i)-1.
+
+    Examples
+    ========
+
+    >>> from sympy.polys.polytools import subresultant_polys
+    >>> from sympy.abc import x
+
+    >>> subresultant_polys(x**2 + 1, x**2 - 1)
+    [4, -2, x**2 - 1]
+
+    Observe that the first element is the resultant.
+
+    >>> from sympy import resultant
+    >>> resultant(x**2 + 1, x**2 - 1)
+    4
+
+    See also
+    ========
+
+    subresultants
+    subresultant_coeffs
+    resultant
+
+    """
+
+    options.allowed_flags(args, ['polys'])
+
+    try:
+        (F, G), opt = parallel_poly_from_expr((f, g), *gens, **args)
+    except PolificationFailed as exc:
+        raise ComputationFailed('subresultant_polys', 2, exc)
+
+    result = F.subresultant_polys(G)
+
+    if not opt.polys:
+        return [r.as_expr() for r in result]
+    else:
+        return result
+
+
+@public
+def subresultant_coeffs(f, g, *gens, **args):
+    """
+    Computes the subresultant coefficients of two polynomials ``f`` and ``g``.
+    These are sometimes called the principal subresultant coefficients (PSC). The
+    returned list has length min(deg(f), deg(g))+1.
+
+    This uses the subresultant polynomials: the coefficient of the ith subresultant
+    polynomial for x^{i-1} is the ith subresultant coefficient.
+
+    The first k subresultants are zero if ``f`` and ``g`` have k common roots.
+
+    Examples
+    ========
+
+    >>> from sympy.polys.polytools import subresultant_coeffs
+    >>> from sympy.abc import x
+
+    >>> subresultant_coeffs(x**2 + 1, x**2 - 1)
+    [4, 0, 1]
+
+    >>> subresultant_coeffs((x-1)*(x-2), (x-1)*(x+2))
+    [0, 4, 1]
+
+    The first element is 0, indicating they share one root.
+
+    >>> subresultant_coeffs((x-1)*(x-2), (x-1)*(x-2)*x)
+    [0, 0, 1]
+
+    The first two elements are 0, indicating they share two roots.
+
+    The coefficients are taken from the subresultant polynomials.
+
+    >>> from sympy.polys.polytools import subresultant_polys
+    >>> subresultant_polys((x-1)*(x-2), (x-1)*(x-2)*x)
+    [0, 0, x**2 - 3*x + 2]
+
+    The coefficients are, in order, the coefficient of x^0, x^1, and x^2 in
+    the polynomials above.
+
+    See also
+    ========
+
+    subresultants
+    subresultant_polys
+    resultant
+
+    """
+
+    options.allowed_flags(args, ['polys'])
+
+    try:
+        (F, G), opt = parallel_poly_from_expr((f, g), *gens, **args)
+    except PolificationFailed as exc:
+        raise ComputationFailed('subresultant_coeffs', 2, exc)
+
+    result = F.subresultant_coeffs(G)
 
     if not opt.polys:
         return [r.as_expr() for r in result]
@@ -6487,8 +6892,7 @@ def to_rational_coeffs(f):
                 rescale_x = simplify(1/rescale1_x)
                 x = f.gens[0]
                 v = [x**n]
-                for i in range(1, n + 1):
-                    v.append(coeffs1[i - 1]*x**(n - i))
+                v.extend(coeffs1[i - 1]*x**(n - i) for i in range(1, n + 1))
                 f = Add(*v)
                 f = Poly(f)
                 return lc, rescale_x, f
@@ -6580,9 +6984,7 @@ def _torational_factor_list(p, x):
     if lc:
         c = simplify(factors[0]*lc*r**n)
         r1 = simplify(1/r)
-        a = []
-        for z in factors[1:][0]:
-            a.append((simplify(z[0].subs({x: x*r1})), z[1]))
+        a = [(simplify(z[0].subs({x: x*r1})), z[1]) for z in factors[1:][0]]
     else:
         c = factors[0]
         a = []
@@ -6889,7 +7291,7 @@ def all_roots(f, multiple=True, radicals=True, extension=False):
     as :class:`~.ComplexRootOf`:
 
     >>> print(all_roots(x**3 + x + 1))
-    [CRootOf(x**3 + x + 1, 0), CRootOf(x**3 + x + 1, 1), CRootOf(x**3 + x + 1, 2)]
+    [CRootOf(_x**3 + _x + 1, 0), CRootOf(_x**3 + _x + 1, 1), CRootOf(_x**3 + _x + 1, 2)]
 
     All roots of any polynomial with rational coefficients of any degree can be
     represented using :py:class:`~.ComplexRootOf`. The use of
@@ -6898,11 +7300,11 @@ def all_roots(f, multiple=True, radicals=True, extension=False):
 
     >>> p = x**5 - x - 1
     >>> for r in all_roots(p): print(r)
-    CRootOf(x**5 - x - 1, 0)
-    CRootOf(x**5 - x - 1, 1)
-    CRootOf(x**5 - x - 1, 2)
-    CRootOf(x**5 - x - 1, 3)
-    CRootOf(x**5 - x - 1, 4)
+    CRootOf(_x**5 - _x - 1, 0)
+    CRootOf(_x**5 - _x - 1, 1)
+    CRootOf(_x**5 - _x - 1, 2)
+    CRootOf(_x**5 - _x - 1, 3)
+    CRootOf(_x**5 - _x - 1, 4)
     >>> [r.evalf(3) for r in all_roots(p)]
     [1.17, -0.765 - 0.352*I, -0.765 + 0.352*I, 0.181 - 1.08*I, 0.181 + 1.08*I]
 
@@ -7062,7 +7464,7 @@ def real_roots(f, multiple=True, radicals=True, extension=False):
 
     >>> p = x**9 + 2*x + 2
     >>> print(real_roots(p))
-    [CRootOf(x**9 + 2*x + 2, 0)]
+    [CRootOf(_x**9 + 2*_x + 2, 0)]
     >>> [r.evalf(3) for r in real_roots(p)]
     [-0.865]
 
@@ -7073,9 +7475,9 @@ def real_roots(f, multiple=True, radicals=True, extension=False):
 
     >>> p = (x + 7)*(x**2 - 2)*(x**3 + x + 1)
     >>> print(real_roots(p))
-    [-7, -sqrt(2), CRootOf(x**3 + x + 1, 0), sqrt(2)]
+    [-7, -sqrt(2), CRootOf(_x**3 + _x + 1, 0), sqrt(2)]
     >>> print(real_roots(p, radicals=False))
-    [-7, CRootOf(x**2 - 2, 0), CRootOf(x**3 + x + 1, 0), CRootOf(x**2 - 2, 1)]
+    [-7, CRootOf(_x**2 - 2, 0), CRootOf(_x**3 + _x + 1, 0), CRootOf(_x**2 - 2, 1)]
 
     All returned root expressions will numerically evaluate to real numbers
     with no imaginary part. This is in contrast to the expressions generated by
@@ -7386,7 +7788,13 @@ def cancel(f, *gens, _signsimp=True, **args):
             if not isinstance(f, Tuple):
                 return f.expand()
             else:
-                return S.One, p, q
+                if q:
+                    r = p/q
+                else:
+                    r = p or 1
+                if r < 0:
+                    return -r, S.NegativeOne, S.One
+                return r, S.One, S.One
     except PolynomialError as msg:
         if f.is_commutative and not f.has(Piecewise):
             raise PolynomialError(msg)
@@ -7411,14 +7819,31 @@ def cancel(f, *gens, _signsimp=True, **args):
                     pass
             return f.xreplace(dict(reps))
 
-    c, (P, Q) = 1, F.cancel(G)
+    P, Q = F.cancel(G)
     if opt.get('polys', False) and 'gens' not in opt:
         opt['gens'] = R.symbols
 
     if not isinstance(f, Tuple):
-        return c*(P.as_expr()/Q.as_expr())
+        return P.as_expr()/Q.as_expr()
     else:
         P, Q = P.as_expr(), Q.as_expr()
+        cp, _ = factor_terms(P).as_coeff_Mul()
+        cq, _ = factor_terms(Q).as_coeff_Mul()
+        if cp and cq:
+            c = cp/cq
+            Q = Q/cq
+            P = P/cp
+        elif cp:
+            c = cp
+            P = P/cp
+        elif cq:
+            c = 1/cq
+            Q = Q/cq
+        else:
+            c = S.One
+        if c < 0:
+            P = -P
+            c = -c
         if not opt.get('polys', False):
             return c, P, Q
         else:
@@ -7755,7 +8180,7 @@ class GroebnerBasis(Basic):
         Examples
         ========
 
-        >>> from sympy import groebner, expand
+        >>> from sympy import groebner, expand, Poly
         >>> from sympy.abc import x, y
 
         >>> f = 2*x**4 - x**2 + y**3 + y**2
@@ -7770,8 +8195,23 @@ class GroebnerBasis(Basic):
         >>> _ == f
         True
 
+        # Using Poly input
+        >>> f_poly = Poly(f, x, y)
+        >>> G = groebner([Poly(x**3 - x), Poly(y**3 - y)])
+
+        >>> G.reduce(f_poly)
+        ([Poly(2*x, x, y, domain='ZZ'), Poly(1, x, y, domain='ZZ')], Poly(x**2 + y**2 + y, x, y, domain='ZZ'))
+
         """
-        poly = Poly._from_expr(expr, self._options)
+        if isinstance(expr, Poly):
+
+            if expr.gens != self._options.gens:
+                raise ValueError("Polynomial generators don't match Groebner basis generators")
+            poly = expr.set_domain(self._options.domain)
+        else:
+
+            poly = Poly._from_expr(expr, self._options)
+
         polys = [poly] + list(self._basis)
 
         opt = self._options

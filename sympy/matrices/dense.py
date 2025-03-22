@@ -128,7 +128,8 @@ class MutableDenseMatrix(DenseMatrix, MutableRepMatrix):
             self[i, j] = _simplify(element, **kwargs)
 
 
-MutableMatrix = Matrix = MutableDenseMatrix
+MutableMatrix = MutableDenseMatrix
+Matrix = MutableDenseMatrix
 
 ###########
 # Numpy Utility Functions:
@@ -213,7 +214,7 @@ def rot_givens(i, j, theta, dim=3):
     j : int between ``0`` and ``dim - 1``
         Represents second axis
     dim : int bigger than 1
-        Number of dimentions. Defaults to 3.
+        Number of dimensions. Defaults to 3.
 
     Examples
     ========

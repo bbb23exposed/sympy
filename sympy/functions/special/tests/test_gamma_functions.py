@@ -123,6 +123,16 @@ def test_gamma_limit():
     assert limit(gamma(1/x), x, 0, dir='+') == S.Infinity
     assert limit(gamma(1/x), x, 0, dir='-') == S.Zero
 
+    #aseries
+    s = Symbol('s', positive=True)
+    assert gamma(s).series(s, oo) == sqrt(2)*sqrt(pi)*(163879/(209018880*s**5) - \
+            571/(2488320*s**4) - 139/(51840*s**3) + 1/(288*s**2) + 1/(12*s) + 1 + \
+            O(s**(-6), (s, oo)))*exp(-s*log(1/s) - s)/sqrt(s)
+    assert gamma(s).series(s, -oo) == sqrt(2)*sqrt(pi)*(163879/(209018880*s**5) - \
+            571/(2488320*s**4) - 139/(51840*s**3) + 1/(288*s**2) + 1/(12*s) + 1 + \
+            O(s**(-6), (s, -oo)))*exp(-s*log(-1/s) - s + I*pi*s)/sqrt(s)
+
+
 
 def tn_branch(s, func):
     from sympy.core.random import uniform
@@ -336,7 +346,7 @@ def test_polygamma():
     assert polygamma(-1, x) == loggamma(x) - log(2*pi) / 2
 
     # But smaller orders are iterated integrals and don't have a special name
-    assert polygamma(-2, x).func is polygamma
+    assert isinstance(polygamma(-2, x), polygamma)
 
     # Test a bug
     assert polygamma(0, -x).expand(func=True) == polygamma(0, -x)

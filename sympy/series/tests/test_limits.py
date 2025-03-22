@@ -17,7 +17,7 @@ from sympy.functions.elementary.miscellaneous import (cbrt, real_root, sqrt)
 from sympy.functions.elementary.piecewise import Piecewise
 from sympy.functions.elementary.trigonometric import (acos, acot, acsc, asec, asin,
                                                       atan, cos, cot, csc, sec, sin, tan)
-from sympy.functions.special.bessel import (besseli, bessely, besselj, besselk)
+from sympy.functions.special.bessel import (besseli, bessely, besselj, besselk, airyai, airybi)
 from sympy.functions.special.error_functions import (Ei, erf, erfc, erfi, fresnelc, fresnels)
 from sympy.functions.special.gamma_functions import (digamma, gamma, lowergamma, uppergamma)
 from sympy.functions.special.hyper import meijerg
@@ -516,18 +516,6 @@ def test_issue_3934():
     assert limit((5**(1/x) + 3**(1/x))**x, x, 0) == 5
 
 
-def test_calculate_series():
-    # NOTE
-    # The calculate_series method is being deprecated and is no longer responsible
-    # for result being returned. The mrv_leadterm function now uses simple leadterm
-    # calls rather than calculate_series.
-
-    # needs gruntz calculate_series to go to n = 32
-    assert limit(x**Rational(77, 3)/(1 + x**Rational(77, 3)), x, oo) == 1
-    # needs gruntz calculate_series to go to n = 128
-    assert limit(x**101.1/(1 + x**101.1), x, oo) == 1
-
-
 def test_issue_5955():
     assert limit((x**16)/(1 + x**16), x, oo) == 1
     assert limit((x**100)/(1 + x**100), x, oo) == 1
@@ -566,6 +554,8 @@ def test_Limit_dir():
 def test_polynomial():
     assert limit((x + 1)**1000/((x + 1)**1000 + 1), x, oo) == 1
     assert limit((x + 1)**1000/((x + 1)**1000 + 1), x, -oo) == 1
+    assert limit(x ** Rational(77, 3) / (1 + x ** Rational(77, 3)), x, oo) == 1
+    assert limit(x ** 101.1 / (1 + x ** 101.1), x, oo) == 1
 
 
 def test_rational():
@@ -816,6 +806,17 @@ def test_limit_with_Float():
 
 def test_issue_10610():
     assert limit(3**x*3**(-x - 1)*(x + 1)**2/x**2, x, oo) == Rational(1, 3)
+
+
+def test_issue_10804():
+    assert limit(airybi(x)*x**(S(1)/4)*exp(-2*x**Rational(3, 2)/3), x, oo)**2 == 1/pi
+    assert limit(2*airyai(x)*x**(S(1)/4)*exp(2*x**Rational(3, 2)/3), x, oo)**2 == 1/pi
+    assert limit(airyai(x), x, oo) == S.Zero
+    assert limit(airyai(x), x, -oo) == S.Zero
+    assert limit(airybi(x), x, oo) ==  S.Infinity
+    assert limit(airybi(x), x, -oo) == S.Zero
+    assert limit(airyai(x), x, 0) == 3**(S(5)/6)*gamma(S(1)/3)/(6*pi)
+    assert limit(airybi(x), x, 0) == 3**(S(1)/3)*gamma(S(1)/3)/(2*pi)
 
 
 def test_issue_10868():

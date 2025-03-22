@@ -1772,10 +1772,8 @@ def _solve_system(exprs, symbols, **flags):
         E = []
         sym_indices = {sym: i for i, sym in enumerate(symbols)}
         for n, e1 in enumerate(exprs):
-            for e2 in exprs[:n]:
-                # Equations are connected if they share a symbol
-                if exprsyms[e1] & exprsyms[e2]:
-                    E.append((e1, e2))
+            # Equations are connected if they share a symbol
+            E.extend((e1, e2) for e2 in exprs[:n] if exprsyms[e1] & exprsyms[e2])
         G = V, E
         subexprs = connected_components(G)
         if len(subexprs) > 1:
@@ -1793,11 +1791,11 @@ def _solve_system(exprs, symbols, **flags):
                 if not isinstance(subsol, list):
                     subsol = [subsol]
                 subsols.append(subsol)
-            # Full solution is cartesian product of subsystems
-            sols = []
-            for soldicts in product(*subsols):
-                sols.append(dict(item for sd in soldicts
-                    for item in sd.items()))
+
+            # Full solution is cartesion product of subsystems
+            sols = [dict(item for sd in soldicts
+                    for item in sd.items()) for soldicts in product(*subsols)]
+
             return linear, sols
 
     polys = []

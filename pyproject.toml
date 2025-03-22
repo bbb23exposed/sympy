@@ -45,6 +45,7 @@ lint.select = [
     "C4",
     "E",
     "F",
+    "FURB187",
     "FURB163", # redundant log base
     "LOG",
     "PIE810",

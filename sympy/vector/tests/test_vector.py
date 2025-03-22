@@ -341,5 +341,12 @@ def test_scalar():
     assert (v1.dot(v2)).is_scalar is True
     assert (v1.cross(v2)).is_scalar is False
 
+
+def test_limit():
+    v1 = a*i + b*j
+    assert v1.limit(a, 0) == b*j
+
+
 def test_issue_27439():
     raises(ValueError, lambda: 1*Vector(*symbols('a b c')))
+

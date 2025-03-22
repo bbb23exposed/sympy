@@ -177,8 +177,7 @@ class CodePrinter(StrPrinter):
             if self._not_supported:
                 frontlines.append(self._get_comment(
                         "Not supported in {}:".format(self.language)))
-                for expr in sorted(self._not_supported, key=str):
-                    frontlines.append(self._get_comment(type(expr).__name__))
+                frontlines.extend(self._get_comment(type(expr).__name__) for expr in sorted(self._not_supported, key=str))
             for name, value in sorted(self._number_symbols, key=str):
                 frontlines.append(self._declare_number_const(name, value))
             lines = frontlines + lines
@@ -468,7 +467,7 @@ class CodePrinter(StrPrinter):
         obj, *wrt_order_pairs = expr.args
         for func_arg in obj.args:
             if not func_arg.is_Symbol:
-                raise ValueError("%s._print_Derivative(...) only supports functions with symobls as arguments." %
+                raise ValueError("%s._print_Derivative(...) only supports functions with symbols as arguments." %
                                  self.__class__.__name__)
         meth_name = '_print_Derivative_%s' % obj.func.__name__
         pmeth = getattr(self, meth_name, None)

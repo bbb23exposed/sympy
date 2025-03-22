@@ -1,5 +1,5 @@
 """
-A module contining deprecated matrix mixin classes.
+A module containing deprecated matrix mixin classes.
 
 The classes in this module are deprecated and will be removed in a future
 release. They are kept here for backwards compatibility in case downstream
@@ -293,12 +293,10 @@ class MatrixShaping(MatrixRequired):
         v = []
         if diagonal:
             for j in range(c):
-                for i in range(j, c):
-                    v.append(self[i, j])
+                v.extend(self[i, j] for i in range(j, c))
         else:
             for j in range(c):
-                for i in range(j + 1, c):
-                    v.append(self[i, j])
+                v.extend(self[i, j] for i in range(j + 1, c))
         return self._new(len(v), 1, v)
 
     def col_del(self, col):

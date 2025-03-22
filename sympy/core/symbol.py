@@ -348,7 +348,7 @@ class Symbol(AtomicExpr, Boolean): # type: ignore
         #
         assumptions_orig = assumptions.copy()
 
-        # The only assumption that is assumed by default is comutative=True:
+        # The only assumption that is assumed by default is commutative=True:
         assumptions.setdefault('commutative', True)
 
         assumptions_kb = StdFactKB(assumptions)
@@ -858,8 +858,7 @@ def symbols(names, *, cls=Symbol, **args) -> Any:
 
         return tuple(result)
     else:
-        for name in names:
-            result.append(symbols(name, cls=cls, **args))
+        result.extend(symbols(name, cls=cls, **args) for name in names)
 
         return type(names)(result)
 

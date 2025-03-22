@@ -640,10 +640,8 @@ class Polygon(GeometrySet):
         Segment2D(Point2D(5, 1), Point2D(0, 1)), Segment2D(Point2D(0, 1), Point2D(0, 0))]
 
         """
-        res = []
         args = self.vertices
-        for i in range(-len(args), 0):
-            res.append(Segment(args[i], args[i + 1]))
+        res = [Segment(args[i], args[i + 1]) for i in range(-len(args), 0)]
         return res
 
     @property
@@ -1404,7 +1402,7 @@ class Polygon(GeometrySet):
         pts.append(pts[0])  # close it
         cw = Polygon._is_clockwise(*pts[:3])
         if cw:
-            pts = list(reversed(pts))
+            pts.reverse()
         for v, a in p.angles.items():
             i = pts.index(v)
             p1, p2 = Point._normalize_dimension(pts[i], pts[i + 1])

@@ -258,7 +258,12 @@ def function_range(f, symbol, domain):
                     vals += FiniteSet(f.subs(symbol, limit_point))
 
             critical_points = solveset(f.diff(symbol), symbol, interval)
-
+            if not critical_points.is_finite_set:
+                raise NotImplementedError(
+                    f"Unable to find explicit critical points for the derivative:\n\n  {f.diff(symbol)} = 0\n\n"
+                    "The computed set of critical points is non-finite, which may be due to the unsimplified form of "
+                    "the derivative (e.g. involving radicals or transcendental functions). "
+                )
             if not iterable(critical_points):
                 raise NotImplementedError(
                         'Unable to find critical points for {}'.format(f))
@@ -334,16 +339,31 @@ def not_empty_in(finset_intersection, *syms):
         return S.EmptySet
 
     if isinstance(finset_intersection, Union):
-        elm_in_sets = finset_intersection.args[0]
-        return Union(not_empty_in(finset_intersection.args[1], *syms),
-                     elm_in_sets)
 
+        return not_empty_in(finset_intersection.args[0], *syms) or not_empty_in(finset_intersection.args[1], *syms)
     if isinstance(finset_intersection, FiniteSet):
         finite_set = finset_intersection
         _sets = S.Reals
+
+    elif isinstance(finset_intersection, Intersection):
+        if len(finset_intersection.args) != 2:
+            raise ValueError('Intersection must have exactly two arguments, not %s: %s' %
+                            (len(finset_intersection.args), finset_intersection))
+
+        if isinstance(finset_intersection.args[0], FiniteSet):
+            finite_set = finset_intersection.args[0]
+            _sets = finset_intersection.args[1]
+
+        elif isinstance(finset_intersection.args[1], FiniteSet):
+            finite_set = finset_intersection.args[1]
+            _sets = finset_intersection.args[0]
+        else:
+            raise ValueError('A FiniteSet must be one of the arguments in the Intersection, not %s and %s' %
+                            (type(finset_intersection.args[0]), type(finset_intersection.args[1])))
+
     else:
-        finite_set = finset_intersection.args[1]
-        _sets = finset_intersection.args[0]
+        raise ValueError('Input must be a FiniteSet or an Intersection, not %s: %s' %
+                         (type(finset_intersection), finset_intersection))
 
     if not isinstance(finite_set, FiniteSet):
         raise ValueError('A FiniteSet must be given, not %s: %s' %
@@ -730,10 +750,10 @@ def is_convex(f, *syms, domain=S.Reals):
     ==========
 
     .. [1] https://en.wikipedia.org/wiki/Convex_function
-    .. [2] http://www.ifp.illinois.edu/~angelia/L3_convfunc.pdf
-    .. [3] https://en.wikipedia.org/wiki/Logarithmically_convex_function
-    .. [4] https://en.wikipedia.org/wiki/Logarithmically_concave_function
-    .. [5] https://en.wikipedia.org/wiki/Concave_function
+    .. [2] https://en.wikipedia.org/wiki/Logarithmically_convex_function
+    .. [3] https://en.wikipedia.org/wiki/Logarithmically_concave_function
+    .. [4] https://en.wikipedia.org/wiki/Concave_function
+    .. [5] https://www.dropbox.com/scl/fi/g54vwyb1n2wb3jyj0gq5x/convexity_summary.pdf?rlkey=ip8ukw15insufm0qf7sieloxo&e=1
 
     """
     if len(syms) > 1 :

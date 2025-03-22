@@ -1813,8 +1813,8 @@ def test_issue_15810():
 def test_issue_21024():
     x = Symbol('x', real=True, nonzero=True)
     f = log(x)*log(4*x) + log(3*x + exp(2))
-    F = x*log(x)**2 + x*(1 - 2*log(2)) + (-2*x + 2*x*log(2))*log(x) + \
-        (x + exp(2)/6)*log(3*x + exp(2)) + exp(2)*log(3*x + exp(2))/6
+    F = x*log(x)**2 + x*log(3*x + exp(2)) + x*(1 - 2*log(2)) + \
+        (-2*x + 2*x*log(2))*log(x) + exp(2)*log(3*x + exp(2))/3
     assert F == integrate(f, x)
 
     f = (x + exp(3))/x**2
@@ -2185,3 +2185,10 @@ def test_issue_27374():
     Ec = diff(u, z, z).subs([(x, sqrt(b*b-z*z))])
     expected_result = -2*sqrt(2)*b*a**3*exp(-b**2*a**2/2)/(3*sqrt(pi))
     assert simplify(integrate(Ec, (z, -b, b))) == expected_result
+
+def test_abs_periodic_functions_issue_27379():
+    # Incorrect splitting of integral lead to wrong answer (-1). Expected result is 1.
+    assert integrate(Abs(cos(x)),(x,-pi/2,0)) == 1
+    assert integrate(Abs(cos(x)),(x,0,5*pi)) == 10
+    assert integrate(Abs(cos(x) + 2*sin(x)), (x,-2*pi, -3 * pi/2)) == 3
+    assert integrate(Abs(2*cos(2*x + 4)), (x, -4*pi, -7*pi/2)) == 2

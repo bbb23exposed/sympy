@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from sympy.integrals.integrals import SymbolLimits
     SExpr = Expr | complex
 
+from sympy import diff
 def _check_norm(elements: Iterable[Expr], norm: Expr | None) -> None:
     """validate if input norm is consistent"""
     if norm is not None and norm.is_number:
@@ -396,6 +397,39 @@ class Quaternion(Expr):
         else:
             raise ValueError("Input elements must have length 3 or 4, got {} "
                              "elements".format(length))
+
+    @classmethod
+    def gradient(cls, q, variables):
+        """Computes the gradient of a quaternion field."""
+        if len(variables) != 3:
+            raise ValueError("Gradient requires exactly 3 variables.")
+        scalar = q.args[0]  # Scalar part
+        vector = q.args[1:]  # Vector parts
+        grad = [diff(scalar, var) for var in variables] + \
+               [diff(vector[i], var) for i in range(3) for var in variables]
+        return grad
+
+    @classmethod
+    def divergence(cls, q, variables):
+        """Computes the divergence of a quaternion field."""
+        if len(variables) != 3:
+            raise ValueError("Divergence requires exactly 3 variables.")
+        vector = q.args[1:]  # Vector parts
+        div = sum(diff(vector[i], variables[i]) for i in range(3))
+        return div
+
+    @classmethod
+    def curl(cls, q, variables):
+        """Computes the curl of the vector part of a quaternion."""
+        if len(variables) != 3:
+            raise ValueError("Curl requires exactly 3 variables.")
+        vector = q.args[1:]  # Vector parts
+        curl_vector = Matrix([
+            [diff(vector[2], variables[1]) - diff(vector[1], variables[2])],
+            [diff(vector[0], variables[2]) - diff(vector[2], variables[0])],
+            [diff(vector[1], variables[0]) - diff(vector[0], variables[1])]
+        ])
+        return curl_vector
 
     @classmethod
     def from_euler(cls, angles: Sequence[SExpr], seq: str) -> Quaternion:

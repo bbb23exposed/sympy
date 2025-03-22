@@ -124,7 +124,7 @@ class Vector(BasisDependent):
 
         ``True``, ``False`` or ``None``. A return value of ``True`` indicates
         that the two vectors are identically equal. A return value of ``False``
-        indictes that they are not. In some cases it is not possible to
+        indicates that they are not. In some cases it is not possible to
         determine if the two vectors are identically equal and ``None`` is
         returned.
 
@@ -419,10 +419,7 @@ class Vector(BasisDependent):
 def get_postprocessor(cls):
     def _postprocessor(expr):
         vec_class = {Add: VectorAdd}[cls]
-        vectors = []
-        for term in expr.args:
-            if isinstance(term.kind, VectorKind):
-                vectors.append(term)
+        vectors = [term for term in expr.args if isinstance(term.kind, VectorKind)]
 
         if vec_class == VectorAdd:
             return VectorAdd(*vectors).doit(deep=False)

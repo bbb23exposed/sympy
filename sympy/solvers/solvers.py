@@ -1386,12 +1386,34 @@ def _solve(f, *symbols, **flags):
     # captured here (for reference below) in case flag value changes
     flags['check'] = checkdens = check = flags.pop('check', True)
 
+    if f.is_Add:
+        # give it a light touch of factoring
+        _f = factor_terms(f)
+        # only keep if it identified more than 1 factor with symbol
+        if _f.is_Mul:
+            hit = False
+            for i in _f.args:
+                if i.has_free(symbol):
+                    if hit:
+                        f = _f
+                        break
+                    hit = True
+
     # build up solutions if f is a Mul
     if f.is_Mul:
         result = set()
         for m in f.args:
-            soln = _vsolve(m, symbol, **flags)
-            result.update(set(soln))
+            soln = set(_vsolve(m, symbol, **flags)) - result
+            reject = set()
+            if check:
+                # we must also check solution in f in
+                # case there are values at which functions cannot be
+                # evaluated (like x=0 in equation with log(x))
+                for s in soln:
+                    if checksol(f, {symbol: s}, **flags) is False:
+                        reject.add(s)
+                        break
+            result.update(soln - reject)
         result = [{symbol: v} for v in result]
         if check:
             # all solutions have been checked but now we must

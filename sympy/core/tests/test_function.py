@@ -494,7 +494,7 @@ def test_func_deriv():
 def test_suppressed_evaluation():
     a = sin(0, evaluate=False)
     assert a != 0
-    assert a.func is sin
+    assert isinstance(a, sin)
     assert a.args == (0,)
 
 
@@ -1452,3 +1452,8 @@ def test_eval_classmethod_check():
         class F(Function):
             def eval(self, x):
                 pass
+
+
+def test_issue_27163():
+    # https://github.com/sympy/sympy/issues/27163
+    raises(TypeError, lambda: Derivative(f, t))

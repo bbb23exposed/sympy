@@ -14,12 +14,13 @@ from sympy.polys.polyerrors import (
     MultivariatePolynomialError,
     GeneratorsNeeded,
     PolynomialError,
-    DomainError)
+    DomainError,
+    NotInvertible)
 from sympy.polys.polyfuncs import symmetrize, viete
 from sympy.polys.polyroots import (
     roots_linear, roots_quadratic, roots_binomial,
     preprocess_roots, roots)
-from sympy.polys.polytools import Poly, factor
+from sympy.polys.polytools import Poly, PurePoly, factor, invert
 from sympy.polys.rationaltools import together
 from sympy.polys.rootisolation import (
     dup_isolate_complex_roots_sqf,
@@ -401,6 +402,25 @@ class ComplexRootOf(RootOf):
         # CRootOf currently only works with univariate polynomials over ZZ/QQ.
         return set()
 
+    def _eval_power(self, other):
+        if not isinstance(other, (Integer, int)):
+            return None
+        if other == 0:
+            return S.One
+        if other == 1:
+            return self
+        if abs(other) < self.poly.degree():
+            return None
+        if 0 < other:
+            x = self.poly.gen
+        elif other < 0:
+            other = -other
+            try:
+                x = invert(self.poly.gen, self.poly)
+            except NotInvertible:
+                return None
+        return (x**other).as_poly(domain=QQ).rem(self.poly)(self)
+
     def _eval_is_real(self):
         """Return ``True`` if the root is real. """
         self._ensure_reals_init()
@@ -686,10 +706,8 @@ class ComplexRootOf(RootOf):
         reals = cls._get_reals(factors)
         reals_count = cls._count_roots(reals)
 
-        roots = []
 
-        for index in range(0, reals_count):
-            roots.append(cls._reals_index(reals, index))
+        roots = [cls._reals_index(reals, index) for index in range(0, reals_count)]
 
         return roots
 
@@ -707,16 +725,13 @@ class ComplexRootOf(RootOf):
         reals = cls._get_reals(factors, use_cache=use_cache)
         reals_count = cls._count_roots(reals)
 
-        roots = []
 
-        for index in range(0, reals_count):
-            roots.append(cls._reals_index(reals, index))
+        roots = [cls._reals_index(reals, index) for index in range(0, reals_count)]
 
         complexes = cls._get_complexes(factors, use_cache=use_cache)
         complexes_count = cls._count_roots(complexes)
 
-        for index in range(0, complexes_count):
-            roots.append(cls._complexes_index(complexes, index))
+        roots.extend(cls._complexes_index(complexes, index) for index in range(0, complexes_count))
 
         return roots
 
@@ -800,10 +815,8 @@ class ComplexRootOf(RootOf):
         """Return postprocessed roots of specified kind
          for polynomials with rational coefficients. """
         coeff, poly = cls._preprocess_roots(poly)
-        roots = []
 
-        for root in getattr(cls, method)(poly):
-            roots.append(coeff*cls._postprocess_root(root, radicals))
+        roots = [coeff*cls._postprocess_root(root, radicals) for root in getattr(cls, method)(poly)]
 
         return roots
 
@@ -1068,7 +1081,7 @@ CRootOf = ComplexRootOf
 
 @dispatch(ComplexRootOf, ComplexRootOf)
 def _eval_is_eq(lhs, rhs): # noqa:F811
-    # if we use is_eq to check here, we get infinite recurion
+    # if we use is_eq to check here, we get infinite recursion
     return lhs == rhs
 
 

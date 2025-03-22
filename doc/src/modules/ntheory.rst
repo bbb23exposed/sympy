@@ -122,6 +122,8 @@ Ntheory Functions Reference
 
 .. autofunction:: solve_congruence
 
+.. autofunction:: frobenius_number
+
 .. module:: sympy.ntheory.multinomial
 
 .. autofunction:: binomial_coefficients
@@ -255,6 +257,8 @@ For factoring `2709077133180915240135586837960864768806330782747` which is a sem
 with two 25 digit factors. `qs` is able to factorize this in around 248s.
 
 .. autofunction:: qs
+
+.. autofunction:: qs_factor
 
 Examples
 --------

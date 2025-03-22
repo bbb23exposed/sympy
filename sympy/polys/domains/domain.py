@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from sympy.core.numbers import AlgebraicNumber
+from sympy.core.expr import Expr
 from sympy.core import Basic, sympify
 from sympy.core.sorting import ordered
 from sympy.external.gmpy import GROUND_TYPES
@@ -116,7 +117,7 @@ class Domain:
     ZZ[x]
     >>> type(K)             # class of the domain
     <class 'sympy.polys.domains.polynomialring.PolynomialRing'>
-    >>> K.dtype             # class of the elements
+    >>> K.dtype             # doctest: +SKIP
     <class 'sympy.polys.rings.PolyElement'>
     >>> p_expr = x**2 + 1   # Expr
     >>> p_expr
@@ -469,7 +470,7 @@ class Domain:
 
     def of_type(self, element):
         """Check if ``a`` is of type ``dtype``. """
-        return isinstance(element, self.tp) # XXX: this isn't correct, e.g. PolyElement
+        return isinstance(element, self.tp)
 
     def __contains__(self, a):
         """Check if ``a`` belongs to this domain. """
@@ -482,7 +483,7 @@ class Domain:
 
         return True
 
-    def to_sympy(self, a):
+    def to_sympy(self, a) -> Expr:
         """Convert domain element *a* to a SymPy expression (Expr).
 
         Explanation

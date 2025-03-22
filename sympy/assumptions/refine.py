@@ -363,11 +363,12 @@ def refine_sign(expr, assumptions):
         if ask(Q.negative(arg), assumptions):
             return S.NegativeOne
     if ask(Q.imaginary(arg)):
-        arg_re, arg_im = arg.as_real_imag()
-        if ask(Q.positive(arg_im), assumptions):
-            return S.ImaginaryUnit
-        if ask(Q.negative(arg_im), assumptions):
-            return -S.ImaginaryUnit
+        coeff = arg/S.ImaginaryUnit
+        if coeff.is_real:
+            if ask(Q.positive(coeff), assumptions):
+                return S.ImaginaryUnit
+            if ask(Q.negative(coeff), assumptions):
+                return -S.ImaginaryUnit
     return expr
 
 
@@ -392,6 +393,29 @@ def refine_matrixelement(expr, assumptions):
         if (i - j).could_extract_minus_sign():
             return expr
         return MatrixElement(matrix, j, i)
+    
+#min/max tests for explicitly given infinities
+def test_refine_min_positive_infinity():
+    z = Symbol('z', real=True) 
+    expr = Min(S.Infinity, sqrt(z)) 
+    result = refine(expr)
+    assert result == sqrt(z), f"Expected sqrt(z), got {result}"
+
+def test_refine_max_negative_infinity():
+  z = Symbol('z', real=True)
+  expr = Max(-1*S.infinity, sqrt(z)) 
+  result = refine(expr) 
+  assert result == sqrt(z), f"Expected sqrt(z), got {result}"
+
+def test_refine_min_both_infinities():
+  expr = Min(S.NegativeInfinity, S.Infinity)
+  result = refine(expr)
+  assert result == S.NegativeInfinity, f"Expected -inf, got {result}"
+
+def test_refine_max_both_infinities():
+  expr = Max(S.NegativeInfinity, S.Infinity)
+  result = refine(expr)
+  assert result == S.Infinity, f"Expected +inf, got {result}"
 
 handlers_dict: dict[str, Callable[[Expr, Boolean], Expr]] = {
     'Abs': refine_abs,

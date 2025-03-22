@@ -22,12 +22,12 @@ from itertools import product
 @public
 def fp_group(fr_grp, relators=()):
     _fp_group = FpGroup(fr_grp, relators)
-    return (_fp_group,) + tuple(_fp_group._generators)
+    return (_fp_group,) + tuple(_fp_group._generators())
 
 @public
 def xfp_group(fr_grp, relators=()):
     _fp_group = FpGroup(fr_grp, relators)
-    return (_fp_group, _fp_group._generators)
+    return (_fp_group, _fp_group._generators())
 
 # Does not work. Both symbols and pollute are undefined. Never tested.
 @public
@@ -264,9 +264,7 @@ class FpGroup(DefaultPrinting):
         if not set(self.generators) <= used_gens:
             return True
         # Abelianisation test: check is the abelianisation is infinite
-        abelian_rels = []
-        for rel in self.relators:
-            abelian_rels.append([rel.exponent_sum(g) for g in self.generators])
+        abelian_rels = [[rel.exponent_sum(g) for g in self.generators] for rel in self.relators]
         m = Matrix(Matrix(abelian_rels))
         if 0 in invariant_factors(m):
             return True

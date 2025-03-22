@@ -30,12 +30,23 @@ markers = [
     "tooslow",
 ]
 
+[tool.coverage.report]
+
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "assert False",
+]
+
 [tool.ruff]
 # Enable Pyflakes `E` and `F` codes by default.
 lint.select = [
+    "B015",  # Useless comparison: a == b rather than a = b.
     "C4",
     "E",
     "F",
+    "FURB187",
+    "FURB163", # redundant log base
     "LOG",
     "PIE810",
     "PLE",
@@ -66,6 +77,7 @@ lint.ignore = [
 exclude = [
     "sympy/assumptions/*generated.py",
     "sympy/core/*_generated.py",
+    "sympy/core/benchmarks/",
     "sympy/parsing/latex/_antlr/*",
     "sympy/parsing/autolev/_antlr/*",
     "sympy/parsing/autolev/test-examples/*",
@@ -130,12 +142,19 @@ module = [
     "theano.*",
     "multiset.*",
     "pysat.*",
+    "bpython.*"
 ]
 ignore_missing_imports = true
 
 # pyright type checker settings:
 [tool.pyright]
 include = ["sympy"]
+exclude = [
+    "sympy/matrices/common.py",
+    "sympy/matrices/matrices.py",
+    "sympy/matrices/tests/test_matrices.py",
+    "sympy/matrices/tests/test_commonmatrix.py",
+]
 
 # This complains when self or cls is not used as the parameter name for an
 # instance method or class method. Since this is used a lot in SymPy we disable

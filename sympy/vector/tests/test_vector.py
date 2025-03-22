@@ -345,3 +345,8 @@ def test_scalar():
 def test_limit():
     v1 = a*i + b*j
     assert v1.limit(a, 0) == b*j
+
+
+def test_issue_27439():
+    raises(ValueError, lambda: 1*Vector(*symbols('a b c')))
+

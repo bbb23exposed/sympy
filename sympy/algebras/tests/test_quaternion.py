@@ -65,6 +65,32 @@ def test_to_and_from_Matrix():
     assert (q - q_full).is_zero_quaternion()
     assert (q.vector_part() - q_vect).is_zero_quaternion()
 
+def test_gradient():
+    x, y, z = symbols('x y z')
+    q = Quaternion(x*y*z, x**2, y**2, z**2)
+    grad = Quaternion.gradient(q, (x, y, z))
+    expected_grad = [
+        diff(x*y*z, x), diff(x*y*z, y), diff(x*y*z, z),
+        diff(x**2, x), diff(x**2, y), diff(x**2, z),
+        diff(y**2, x), diff(y**2, y), diff(y**2, z),
+        diff(z**2, x), diff(z**2, y), diff(z**2, z)
+    ]
+    assert grad == expected_grad, f"Expected {expected_grad}, but got {grad}"
+
+def test_quaternion_divergence():
+    x, y, z = symbols('x y z')
+    q = Quaternion(0, x, y, z)
+    div = Quaternion.divergence(q, (x, y, z))
+    expected_div = 3
+
+    assert div == expected_div, f"Expected {expected_div}, but got {div}"
+
+def test_quaternion_curl():
+    x, y, z = symbols('x y z')
+    q = Quaternion(0, x, y, z)
+    curl = Quaternion.curl(q, (x, y, z))
+    expected_curl = Matrix([[0], [0], [0]])
+    assert curl == expected_curl, f"Expected {expected_curl}, but got {curl}"
 
 def test_product_matrices():
     q1 = Quaternion(w, x, y, z)
@@ -164,7 +190,7 @@ def test_quaternion_functions():
         Rational(-7, 225), Rational(-1, 225), Rational(-1, 150), Rational(-2, 225))
     assert q1**(-2) == Quaternion(
         Rational(-7, 225), Rational(-1, 225), Rational(-1, 150), Rational(-2, 225))
-    assert q1.pow(-0.5) == NotImplemented
+    assert q1.pow(-0.5) == NotImplemented # type: ignore
     raises(TypeError, lambda: q1**(-0.5))
 
     assert q1.exp() == \
@@ -188,6 +214,15 @@ def test_quaternion_functions():
 
     assert integrate(Quaternion(x, x, x, x), x) == \
     Quaternion(x**2 / 2, x**2 / 2, x**2 / 2, x**2 / 2)
+
+    assert Quaternion(1, x, x**2, x**3).integrate(x) == \
+    Quaternion(x, x**2/2, x**3/3, x**4/4)
+
+    assert Quaternion(sin(x), cos(x), sin(2*x), cos(2*x)).integrate(x) == \
+    Quaternion(-cos(x), sin(x), -cos(2*x)/2, sin(2*x)/2)
+
+    assert Quaternion(x**2, y**2, z**2, x*y*z).integrate(x, y) == \
+    Quaternion(x**3*y/3, x*y**3/3, x*y*z**2, x**2*y**2*z/4)
 
     assert Quaternion.rotate_point((1, 1, 1), q1) == (S.One / 5, 1, S(7) / 5)
     n = Symbol('n')
@@ -422,7 +457,7 @@ def test_to_euler_options():
                 else:
                     seq = ''.join(seq_tuple)
 
-                for elements in product([-1, 0, 1], repeat=4):
-                    q = Quaternion(*elements)
+                for e1, e2, e3, e4 in product([-1, 0, 1], repeat=4):
+                    q = Quaternion(e1, e2, e3, e4)
                     if not q.is_zero_quaternion():
                         test_one_case(q)

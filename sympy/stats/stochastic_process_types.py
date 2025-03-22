@@ -1044,7 +1044,7 @@ class DiscreteMarkovChain(DiscreteTimeStochasticProcess, MarkovProcess):
         for class_ in classes:
             # begin recurrent check (similar to self._check_trans_probs())
             submatrix = T[class_, class_]  # get the submatrix with those states
-            is_recurrent = S.true
+            is_recurrent: Boolean = S.true
             rows = submatrix.tolist()
             for row in rows:
                 if (sum(row) - 1) != 0:
@@ -1333,7 +1333,7 @@ class DiscreteMarkovChain(DiscreteTimeStochasticProcess, MarkovProcess):
 
         This means that state 2 is the only absorbing state
         (since A is a 1x1 matrix). B is a 4x1 matrix since
-        the 4 remaining transient states all merge into reccurent
+        the 4 remaining transient states all merge into recurrent
         state 2. And C is the 4x4 matrix that shows how the
         transient states 0, 1, 3, 4 all interact.
 

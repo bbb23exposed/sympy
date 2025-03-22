@@ -1603,9 +1603,7 @@ class FormalPowerSeriesProduct(FiniteFormalPowerSeries):
 
         aks = convolution(coeff1[:n], coeff2[:n])
 
-        terms = []
-        for i in range(0, n):
-            terms.append(aks[i] * self.ffps.xk.coeff(i))
+        terms = [aks[i] * self.ffps.xk.coeff(i) for i in range(0, n)]
 
         return Add(*terms)
 
@@ -1818,6 +1816,45 @@ def fps(f, x=None, x0=0, dir=1, hyper=True, order=4, rational=True, full=False):
         Set full to True to increase the range of rational algorithm.
         See :func:`rational_algorithm` for details. By default it is set to
         False.
+
+    Returns
+    =======
+
+    FormalPowerSeries
+        An object representing the formal power series of the input function.
+
+    Working with FormalPowerSeries Objects
+    ======================================
+
+    The returned FormalPowerSeries object can be manipulated and interrogated:
+
+    1. Accessing the Structure:
+        Use ``.args`` to access the internal structure:
+
+        >>> from sympy import fps, exp
+        >>> from sympy.abc import x
+        >>> series = fps(exp(x))
+        >>> series.args
+        (exp(x), x, 0, 1, (SeqFormula(Piecewise((1/factorial(_k), Eq(Mod(_k, 1), 0)),
+        (0, True)), (_k, 1, oo)), SeqFormula(x**_k, (_k, 0, oo)), 1))
+
+    2. Accessing Coefficients:
+        The coefficient sequence is a SeqFormula object:
+
+        >>> coeff_seq = series.args[4][0]
+        >>> type(coeff_seq)
+        <class 'sympy.series.sequences.SeqFormula'>
+        >>> coeff_seq[3]
+        1/24
+
+    3. Accessing Sequence:
+        The power sequence is a SeqFormula object:
+
+        >>> power_seq = series.args[4][1]
+        >>> type(power_seq)
+        <class 'sympy.series.sequences.SeqFormula'>
+        >>> power_seq[3]
+        x**3
 
     Examples
     ========
